@@ -396,7 +396,7 @@ export const TEAM = [
   { name: "Lucas Pinheiro Marques", ra: "8222242608", initials: "LM", avatar: "av-1" },
   { name: "Leonardo Del Carlo", ra: "823157802", initials: "LD", avatar: "av-3" },
   { name: "Pedro Henrique Pontes", ra: "823135028", initials: "PH", avatar: "av-4" },
-  { name: "Gabriel Campos Batista", ra: "823125083", initials: "GB", avatar: "av-5" },
+  { name: "Gabriel Campos Batista de Souza", ra: "823125083", initials: "GB", avatar: "av-5" },
 ];
 
 export const getProduct = (slug) => PRODUCTS.find((p) => p.slug === slug);
