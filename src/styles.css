@@ -828,6 +828,7 @@ h4 {
 }
 
 .product-card {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -1685,6 +1686,47 @@ input[type="range"] {
   background: var(--brand);
   border-color: var(--brand);
   color: #fff;
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-btn:disabled:hover {
+  border-color: var(--line);
+  color: var(--ink-2);
+}
+
+.explore-search {
+  margin-top: 26px;
+}
+
+.empty-state {
+  background: var(--surface);
+  border: 1px dashed #c8d4cd;
+  border-radius: var(--radius);
+  padding: 56px 32px;
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.empty-state .icon {
+  color: var(--brand);
+  margin-bottom: 6px;
+}
+
+.empty-state h3 {
+  font-size: 18px;
+}
+
+.empty-state p {
+  color: var(--muted);
+  font-size: 14.5px;
+  max-width: 380px;
+  margin-bottom: 10px;
 }
 
 /* ==========================================================================
