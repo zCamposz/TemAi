@@ -100,4 +100,4 @@ Suba o conteúdo da pasta `dist/` para a branch de publicação (ou configure o 
 | Lucas Pinheiro Marques | 8222242608 |
 | Leonardo Del Carlo | 823157802 |
 | Pedro Henrique Pontes | 823135028 |
-| Gabriel Campos Batista | 823125083 |
+| Gabriel Campos Batista de Souza | 823125083 |
