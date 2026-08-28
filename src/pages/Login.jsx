@@ -1,7 +1,10 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/AuthLayout";
+import { useAuth } from "../components/AuthProvider";
 import { GoogleMark } from "../components/Icon";
 import { useToast } from "../components/ToastProvider";
+import { getAuthErrorMessage } from "../lib/authErrors";
 
 const BENEFITS = [
   { icon: "pin", text: "Itens a poucos minutos de você" },
@@ -10,11 +13,45 @@ const BENEFITS = [
   { icon: "leaf", text: "Consumo alinhado ao ODS 12 da ONU" },
 ];
 
-const INCREMENT_1 =
-  "O sistema de autenticação e perfis de usuário será a primeira entrega do projeto — Incremento 1.";
-
 export default function Login() {
+  const { user, loading, isConfigured, signIn } = useAuth();
   const showToast = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = location.state?.from ?? "/";
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!loading && user) navigate("/", { replace: true });
+  }, [loading, user, navigate]);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
+
+    if (!isConfigured) {
+      setError("Supabase não configurado. Verifique o arquivo .env.");
+      return;
+    }
+
+    const form = e.currentTarget;
+    const email = form.email.value.trim();
+    const password = form.senha.value;
+
+    setSubmitting(true);
+    try {
+      await signIn(email, password);
+      showToast("Bem-vindo!", "Login realizado com sucesso.");
+      navigate(redirectTo, { replace: true });
+    } catch (err) {
+      setError(getAuthErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loading || user) return null;
 
   return (
     <AuthLayout
@@ -25,18 +62,19 @@ export default function Login() {
       <h1>Bem-vindo de volta!</h1>
       <p>Entre com seus dados para continuar.</p>
 
-      <form
-        className="auth-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          showToast("Login simulado", INCREMENT_1);
-        }}
-      >
+      <form className="auth-form" onSubmit={handleSubmit}>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+
         <div className="form-field">
           <label htmlFor="email">E-mail</label>
           <input
             type="email"
             id="email"
+            name="email"
             placeholder="voce@exemplo.com"
             autoComplete="email"
             required
@@ -48,6 +86,7 @@ export default function Login() {
           <input
             type="password"
             id="senha"
+            name="senha"
             placeholder="••••••••"
             autoComplete="current-password"
             required
@@ -56,21 +95,24 @@ export default function Login() {
 
         <div className="form-aux">
           <label className="check-row" style={{ padding: 0 }}>
-            <input type="checkbox" /> Lembrar de mim
+            <input type="checkbox" defaultChecked /> Lembrar de mim
           </label>
           <a
             href="#/login"
             onClick={(e) => {
               e.preventDefault();
-              showToast("Recuperação de senha", INCREMENT_1);
+              showToast(
+                "Recuperação de senha",
+                "Em breve você poderá redefinir a senha por e-mail."
+              );
             }}
           >
             Esqueci minha senha
           </a>
         </div>
 
-        <button type="submit" className="btn btn-primary btn-lg btn-block">
-          Entrar
+        <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={submitting}>
+          {submitting ? "Entrando…" : "Entrar"}
         </button>
 
         <div className="auth-divider">ou continue com</div>
@@ -79,7 +121,10 @@ export default function Login() {
           type="button"
           className="btn btn-social btn-block"
           onClick={() =>
-            showToast("Login social", "A autenticação com Google está prevista para o Incremento 1 do projeto.")
+            showToast(
+              "Login social",
+              "A autenticação com Google será habilitada em uma próxima entrega."
+            )
           }
         >
           <GoogleMark />
