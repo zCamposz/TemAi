@@ -70,7 +70,7 @@ const INCREMENTS = [
 
 export default function About() {
   return (
-    <Layout note="este site é o resultado da fase de Prototipagem do ciclo de vida do projeto">
+    <Layout note="Incremento 1 concluído · Incremento 2 em andamento — cadastro de produtos">
       <section className="page-hero">
         <div className="container">
           <nav className="breadcrumb" aria-label="Trilha de navegação">
@@ -215,32 +215,48 @@ export default function About() {
           </div>
 
           <div className="timeline">
-            <div className="tl-item current">
+            <div className="tl-item done">
               <span className="tl-dot">
-                <Icon name="penTool" />
+                <Icon name="checkCircle" />
               </span>
               <div className="tl-card">
-                <span className="pill">Fase atual — você está aqui</span>
+                <span className="pill">Concluída</span>
                 <h3>Prototipagem</h3>
                 <p>
                   Criação das telas do site para dar aos usuários e stakeholders uma ideia clara do
-                  produto final. Este site é o resultado navegável dessa fase: todas as interfaces
-                  das funcionalidades planejadas podem ser exploradas e validadas antes do
-                  desenvolvimento.
+                  produto final. Todas as interfaces das funcionalidades planejadas foram
+                  navegáveis e validadas antes do desenvolvimento incremental.
                 </p>
               </div>
             </div>
 
-            {INCREMENTS.map((increment, index) => (
-              <div className="tl-item" key={increment.title}>
-                <span className="tl-dot">{index + 1}</span>
-                <div className="tl-card">
-                  <span className="pill pill-accent">Incremento {index + 1}</span>
-                  <h3>{increment.title}</h3>
-                  <p>{increment.text}</p>
+            {INCREMENTS.map((increment, index) => {
+              const num = index + 1;
+              const isDone = num === 1;
+              const isCurrent = num === 2;
+              const itemClass = ["tl-item", isDone && "done", isCurrent && "current"]
+                .filter(Boolean)
+                .join(" ");
+
+              return (
+                <div className={itemClass} key={increment.title}>
+                  <span className="tl-dot">
+                    {isDone ? <Icon name="checkCircle" /> : num}
+                  </span>
+                  <div className="tl-card">
+                    {isCurrent ? (
+                      <span className="pill">Fase atual — você está aqui</span>
+                    ) : isDone ? (
+                      <span className="pill">Concluído</span>
+                    ) : (
+                      <span className="pill pill-accent">Incremento {num}</span>
+                    )}
+                    <h3>{increment.title}</h3>
+                    <p>{increment.text}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -273,32 +289,32 @@ export default function About() {
         <div className="container">
           <div className="cta-band">
             <div>
-              <h2>Explore o protótipo</h2>
+              <h2>Explore o Tem Aí?</h2>
               <p>
-                Navegue pelas telas das quatro funcionalidades planejadas e ajude a validar o produto
-                antes do primeiro incremento.
+                O Incremento 1 já entrega login, cadastro e perfil. Agora estamos no Incremento 2:
+                cadastro real de produtos com especificações detalhadas.
               </p>
               <div className="cta-actions">
                 <Link to="/explorar" className="btn btn-accent btn-lg">
                   Explorar itens
                 </Link>
-                <Link to="/cadastro" className="btn btn-light">
-                  Ver tela de cadastro
+                <Link to="/anunciar" className="btn btn-light">
+                  Anunciar item
                 </Link>
               </div>
             </div>
             <ul className="cta-list">
               <li>
                 <Icon name="checkCircle" />
+                Login, cadastro e perfil de usuário
+              </li>
+              <li>
+                <Icon name="checkCircle" />
                 Busca e listagem de itens
               </li>
               <li>
                 <Icon name="checkCircle" />
-                Página de produto com reserva
-              </li>
-              <li>
-                <Icon name="checkCircle" />
-                Login, cadastro e anúncio de itens
+                Página de produto com simulação de reserva
               </li>
             </ul>
           </div>

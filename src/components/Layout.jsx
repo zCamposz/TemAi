@@ -6,7 +6,7 @@ export default function Layout({ note, children }) {
     <>
       {note && (
         <div className="proto-note">
-          <strong>Protótipo navegável</strong> — {note}
+          <strong>Desenvolvimento incremental</strong> — {note}
         </div>
       )}
       <Header />

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "./AuthProvider";
 import Icon, { BrandMark } from "./Icon";
+import { getInitials } from "../lib/authErrors";
 
 const LINKS = [
   { to: "/", label: "Início", end: true },
@@ -11,11 +13,14 @@ const LINKS = [
 ];
 
 export default function Header() {
+  const { user, profile, loading, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const navRef = useRef(null);
   const toggleRef = useRef(null);
+
+  const displayName = profile?.nome ?? user?.user_metadata?.nome ?? "Conta";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -37,8 +42,12 @@ export default function Header() {
     return () => document.removeEventListener("click", onClickOutside);
   }, [open]);
 
-  // A página de detalhe do produto pertence ao fluxo de busca
   const exploreActive = location.pathname.startsWith("/produto");
+
+  async function handleSignOut() {
+    await signOut();
+    setOpen(false);
+  }
 
   return (
     <header className={scrolled ? "site-header scrolled" : "site-header"}>
@@ -80,9 +89,21 @@ export default function Header() {
         </nav>
 
         <div className="header-actions">
-          <Link to="/login" className="btn btn-ghost">
-            Entrar
-          </Link>
+          {!loading && user ? (
+            <>
+              <Link to="/perfil" className="header-user" title={displayName}>
+                <span className="avatar header-avatar">{getInitials(displayName)}</span>
+                <span className="header-user-name">{displayName.split(" ")[0]}</span>
+              </Link>
+              <button type="button" className="btn btn-ghost header-signout" onClick={handleSignOut}>
+                Sair
+              </button>
+            </>
+          ) : (
+            <Link to="/login" className="btn btn-ghost">
+              Entrar
+            </Link>
+          )}
           <Link to="/anunciar" className="btn btn-primary">
             <Icon name="plus" size="sm" />
             Anunciar item

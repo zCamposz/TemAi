@@ -78,7 +78,7 @@ export default function Home() {
   const featured = PRODUCTS.filter((product) => product.featured);
 
   return (
-    <Layout note="fase de Prototipagem do projeto Tem Aí? · As funcionalidades serão entregues de forma incremental">
+    <Layout note="Incremento 1 concluído · Incremento 2 em andamento — cadastro de produtos com especificações detalhadas">
       {/* ============ HERO ============ */}
       <section className="hero">
         <div className="container">

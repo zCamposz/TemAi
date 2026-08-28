@@ -1,7 +1,10 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/AuthLayout";
+import { useAuth } from "../components/AuthProvider";
 import { GoogleMark } from "../components/Icon";
 import { useToast } from "../components/ToastProvider";
+import { getAuthErrorMessage } from "../lib/authErrors";
 
 const BENEFITS = [
   { icon: "checkCircle", text: "Cadastro gratuito, sem mensalidade" },
@@ -10,7 +13,50 @@ const BENEFITS = [
 ];
 
 export default function Register() {
+  const { user, loading, isConfigured, signUp } = useAuth();
   const showToast = useToast();
+  const navigate = useNavigate();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!loading && user) navigate("/", { replace: true });
+  }, [loading, user, navigate]);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
+
+    if (!isConfigured) {
+      setError("Supabase não configurado. Verifique o arquivo .env.");
+      return;
+    }
+
+    const form = e.currentTarget;
+    const nome = form.nome.value.trim();
+    const email = form.email.value.trim();
+    const telefone = form.telefone.value.trim();
+    const senha = form.senha.value;
+    const senha2 = form.senha2.value;
+
+    if (senha !== senha2) {
+      setError("As senhas não coincidem.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await signUp({ nome, email, telefone, password: senha });
+      showToast("Conta criada!", "Bem-vindo(a) ao Tem Aí?");
+      navigate("/", { replace: true });
+    } catch (err) {
+      setError(getAuthErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loading || user) return null;
 
   return (
     <AuthLayout
@@ -21,21 +67,19 @@ export default function Register() {
       <h1>Criar conta</h1>
       <p>Preencha seus dados para começar.</p>
 
-      <form
-        className="auth-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          showToast(
-            "Cadastro simulado",
-            "O sistema de autenticação e perfis de usuário será a primeira entrega do projeto — Incremento 1."
-          );
-        }}
-      >
+      <form className="auth-form" onSubmit={handleSubmit}>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+
         <div className="form-field">
           <label htmlFor="nome">Nome completo</label>
           <input
             type="text"
             id="nome"
+            name="nome"
             placeholder="Como você quer ser chamado(a)"
             autoComplete="name"
             required
@@ -47,6 +91,7 @@ export default function Register() {
           <input
             type="email"
             id="email"
+            name="email"
             placeholder="voce@exemplo.com"
             autoComplete="email"
             required
@@ -58,6 +103,7 @@ export default function Register() {
           <input
             type="tel"
             id="telefone"
+            name="telefone"
             placeholder="(11) 99999-9999"
             autoComplete="tel"
             required
@@ -71,6 +117,7 @@ export default function Register() {
             <input
               type="password"
               id="senha"
+              name="senha"
               placeholder="Mínimo 8 caracteres"
               autoComplete="new-password"
               minLength={8}
@@ -82,6 +129,7 @@ export default function Register() {
             <input
               type="password"
               id="senha2"
+              name="senha2"
               placeholder="Repita a senha"
               autoComplete="new-password"
               minLength={8}
@@ -105,8 +153,8 @@ export default function Register() {
           </span>
         </label>
 
-        <button type="submit" className="btn btn-primary btn-lg btn-block">
-          Criar minha conta
+        <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={submitting}>
+          {submitting ? "Criando conta…" : "Criar minha conta"}
         </button>
 
         <div className="auth-divider">ou continue com</div>
@@ -117,7 +165,7 @@ export default function Register() {
           onClick={() =>
             showToast(
               "Cadastro social",
-              "A autenticação com Google está prevista para o Incremento 1 do projeto."
+              "A autenticação com Google será habilitada em uma próxima entrega."
             )
           }
         >

@@ -26,7 +26,7 @@ export default function Announce() {
   const estimate = Math.max(0, simPrice) * Math.min(30, Math.max(0, simDays));
 
   return (
-    <Layout note="o cadastro de produtos com especificações detalhadas será entregue no Incremento 2 do projeto">
+    <Layout note="Incremento 2 em andamento — cadastro de produtos com especificações detalhadas">
       <section className="page-hero">
         <div className="container">
           <nav className="breadcrumb" aria-label="Trilha de navegação">

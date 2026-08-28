@@ -1,6 +1,6 @@
 /* ==========================================================================
    Tem Aí? — Design System
-   Protótipo estático · Fase de Prototipagem
+   Incremento 2 em andamento · Incremento 1 concluído
    ========================================================================== */
 
 /* ---------- Tokens ---------- */
@@ -385,6 +385,78 @@ h4 {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.header-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+
+.header-user:hover {
+  background: rgba(21, 36, 32, 0.06);
+}
+
+.header-avatar {
+  width: 34px;
+  height: 34px;
+  font-size: 12px;
+  background: var(--brand);
+}
+
+.header-user-name {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-error {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.auth-loading {
+  min-height: 40vh;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.profile-layout {
+  display: grid;
+  gap: 24px;
+  max-width: 640px;
+  margin: 0 auto 80px;
+}
+
+.profile-summary {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.profile-form h2 {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .nav-toggle {
@@ -2679,6 +2751,16 @@ input[type="range"] {
   z-index: 1;
 }
 
+.tl-item.done .tl-dot {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.tl-item.done .tl-card {
+  border-color: rgba(19, 122, 80, 0.25);
+}
+
 .tl-item.current .tl-dot {
   background: var(--brand);
   border-color: var(--brand);
@@ -2917,7 +2999,12 @@ input[type="range"] {
     display: inline-flex;
   }
 
-  .header-actions .btn-ghost {
+  .header-actions .btn-ghost:not(.header-signout) {
+    display: none;
+  }
+
+  .header-user-name,
+  .header-signout {
     display: none;
   }
 
