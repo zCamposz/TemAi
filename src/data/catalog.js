@@ -350,6 +350,16 @@ const RAW_PRODUCTS = [
   },
 ];
 
+const NEIGHBORHOOD_COORDS = {
+  "Vila Mariana": { lat: -23.5893, lng: -46.6344 },
+  "Vila Clementino": { lat: -23.5986, lng: -46.6394 },
+  Aclimação: { lat: -23.5714, lng: -46.6278 },
+  Ipiranga: { lat: -23.5882, lng: -46.611 },
+  Saúde: { lat: -23.6153, lng: -46.6236 },
+  Paraíso: { lat: -23.575, lng: -46.648 },
+  Cambuci: { lat: -23.5635, lng: -46.6145 },
+};
+
 /** Itens cujo locador oferece entrega na região. */
 const WITH_DELIVERY = new Set([
   "betoneira-120l",
@@ -364,6 +374,8 @@ const UNVERIFIED_OWNERS = new Set(["Sandra L."]);
 
 export const PRODUCTS = RAW_PRODUCTS.map((product) => ({
   ...product,
+  city: product.city ?? "São Paulo",
+  ...NEIGHBORHOOD_COORDS[product.neighborhood],
   delivery: WITH_DELIVERY.has(product.slug),
   owner: { ...product.owner, verified: !UNVERIFIED_OWNERS.has(product.owner.name) },
 }));
@@ -406,4 +418,7 @@ export const formatPrice = (value) =>
 
 export const formatRating = (value) => value.toFixed(1).replace(".", ",");
 
-export const formatDistance = (value) => value.toFixed(1).replace(".", ",") + " km";
+export const formatDistance = (value) => {
+  if (value == null || Number.isNaN(Number(value))) return "distância a calcular";
+  return Number(value).toFixed(1).replace(".", ",") + " km";
+};
