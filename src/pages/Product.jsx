@@ -1,16 +1,12 @@
-import { useMemo, useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout";
 import ProductCard from "../components/ProductCard";
 import Icon, { Stars } from "../components/Icon";
+import { useAuth } from "../components/AuthProvider";
 import { useToast } from "../components/ToastProvider";
-import {
-  PRODUCTS,
-  REVIEWS,
-  formatPrice,
-  formatRating,
-  getProduct,
-} from "../data/catalog";
+import { REVIEWS, formatDistance, formatPrice, formatRating, getProduct } from "../data/catalog";
+import { fetchProductBySlug, useMergedProducts } from "../lib/products";
 
 const SERVICE_FEE = 0.1;
 const THUMB_ICONS = ["box", "zap", "camera"];
@@ -23,25 +19,80 @@ const addDays = (days) => {
   return toISO(date);
 };
 
+function deliveryRule(product) {
+  const options = [];
+  if (product.pickup !== false) options.push("retirada no endereço do locador");
+  if (product.delivery) options.push("entrega na região (taxa combinada pelo chat)");
+  if (product.meetup) options.push("ponto de encontro combinado");
+  if (options.length === 0) {
+    return "Retirada e devolução combinadas pelo chat.";
+  }
+  return options.join(", com ").replace(/^./, (c) => c.toUpperCase()) + ".";
+}
+
 export default function Product() {
   const { slug } = useParams();
-  const product = getProduct(slug);
+  const catalogProduct = getProduct(slug);
+  const { products } = useMergedProducts();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const showToast = useToast();
 
+  const [product, setProduct] = useState(catalogProduct ?? null);
+  const [loading, setLoading] = useState(!catalogProduct);
   const [start, setStart] = useState(() => addDays(1));
   const [end, setEnd] = useState(() => addDays(3));
   const [activeThumb, setActiveThumb] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+    setActiveThumb(0);
+    setProduct(getProduct(slug) ?? null);
+    setLoading(true);
+
+    (async () => {
+      try {
+        const live = await fetchProductBySlug(slug);
+        if (!mounted) return;
+        if (live) setProduct(live);
+        else setProduct(getProduct(slug) ?? null);
+      } catch {
+        if (mounted) setProduct(getProduct(slug) ?? null);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [slug]);
 
   const days = useMemo(() => {
     const diff = Math.round((new Date(end) - new Date(start)) / 86400000);
     return Number.isNaN(diff) || diff < 1 ? 1 : diff;
   }, [start, end]);
 
+  if (loading && !product) {
+    return (
+      <Layout>
+        <div className="container" style={{ paddingTop: 48 }}>
+          <p className="empty-state">Carregando anúncio…</p>
+        </div>
+      </Layout>
+    );
+  }
+
   if (!product) return <Navigate to="/explorar" replace />;
 
   const subtotal = product.price * days;
   const fee = Math.round(subtotal * SERVICE_FEE);
   const total = subtotal + fee + product.deposit;
+  const city = product.city ?? "São Paulo";
+  const photos = product.photos?.filter(Boolean) ?? [];
+  const hasPhotos = photos.length > 0;
+  const thumbs = hasPhotos ? photos : [product.icon, ...THUMB_ICONS];
 
   const handleStartChange = (value) => {
     setStart(value);
@@ -52,11 +103,9 @@ export default function Product() {
     }
   };
 
-  const similar = PRODUCTS.filter(
-    (item) => item.category === product.category && item.slug !== product.slug
-  ).slice(0, 3);
-
-  const thumbs = [product.icon, ...THUMB_ICONS];
+  const similar = products
+    .filter((item) => item.category === product.category && item.slug !== product.slug)
+    .slice(0, 3);
 
   return (
     <Layout note="a reserva e a transação end-to-end serão entregues no Incremento 4 do projeto">
@@ -78,41 +127,46 @@ export default function Product() {
           <div className="product-meta">
             <span className="rating-inline">
               <Icon name="star" size="sm" />
-              <strong>{formatRating(product.rating)}</strong>&nbsp;· {product.reviews} avaliações
+              <strong>{formatRating(product.rating)}</strong>
+              {product.reviews > 0 ? <>&nbsp;· {product.reviews} avaliações</> : <>&nbsp;· novo</>}
             </span>
             <span>
               <Icon name="pin" size="sm" />
-              {product.neighborhood}, São Paulo · a{" "}
-              {product.distance.toFixed(1).replace(".", ",")} km de você
+              {product.neighborhood}, {city} · {formatDistance(product.distance)} de você
             </span>
             <span>
               <Icon name="recycle" size="sm" />
-              Alugado {product.rentals} vezes
+              {product.rentals > 0 ? `Alugado ${product.rentals} vezes` : "Ainda não foi alugado"}
             </span>
           </div>
         </div>
 
         <div className="product-layout">
-          {/* ============ COLUNA PRINCIPAL ============ */}
           <div>
-            <div className={`gallery-main ${product.hue}`}>
-              <span className="media-icon">
-                <Icon name={thumbs[activeThumb]} />
-              </span>
+            <div className={`gallery-main ${product.hue}${hasPhotos ? " has-photo" : ""}`}>
+              {hasPhotos ? (
+                <img src={thumbs[activeThumb]} alt={product.title} />
+              ) : (
+                <span className="media-icon">
+                  <Icon name={thumbs[activeThumb]} />
+                </span>
+              )}
             </div>
 
             <div className="gallery-thumbs">
-              {thumbs.map((icon, index) => (
+              {thumbs.map((thumb, index) => (
                 <button
                   type="button"
-                  key={icon}
+                  key={hasPhotos ? thumb : `${thumb}-${index}`}
                   className={
-                    index === activeThumb ? `thumb ${product.hue} current` : `thumb ${product.hue}`
+                    index === activeThumb
+                      ? `thumb ${product.hue} current${hasPhotos ? " has-photo" : ""}`
+                      : `thumb ${product.hue}${hasPhotos ? " has-photo" : ""}`
                   }
                   aria-label={`Foto ${index + 1}`}
                   onClick={() => setActiveThumb(index)}
                 >
-                  <Icon name={icon} />
+                  {hasPhotos ? <img src={thumb} alt="" /> : <Icon name={thumb} />}
                 </button>
               ))}
             </div>
@@ -143,9 +197,7 @@ export default function Product() {
               <ul className="rules-list">
                 <li>
                   <Icon name="checkCircle" />
-                  {product.delivery
-                    ? "Retirada no meu endereço ou entrega na região (taxa combinada pelo chat)."
-                    : "Retirada e devolução no meu endereço (combinamos o horário pelo chat)."}
+                  {deliveryRule(product)}
                 </li>
                 <li>
                   <Icon name="checkCircle" />
@@ -165,26 +217,31 @@ export default function Product() {
 
             <div className="detail-block">
               <h2>Avaliações ({product.reviews})</h2>
-              {REVIEWS.map((review) => (
-                <div className="review-item" key={review.name}>
-                  <div className="review-head">
-                    <span className={`avatar ${review.avatar}`}>{review.initials}</span>
-                    <div>
-                      <strong style={{ fontSize: "14.5px" }}>{review.name}</strong>
-                      <br />
-                      <span style={{ fontSize: "12.5px", color: "var(--muted)" }}>
-                        {review.when}
-                      </span>
+              {product.reviews > 0 ? (
+                REVIEWS.map((review) => (
+                  <div className="review-item" key={review.name}>
+                    <div className="review-head">
+                      <span className={`avatar ${review.avatar}`}>{review.initials}</span>
+                      <div>
+                        <strong style={{ fontSize: "14.5px" }}>{review.name}</strong>
+                        <br />
+                        <span style={{ fontSize: "12.5px", color: "var(--muted)" }}>
+                          {review.when}
+                        </span>
+                      </div>
+                      <Stars />
                     </div>
-                    <Stars />
+                    <p>{review.text}</p>
                   </div>
-                  <p>{review.text}</p>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p style={{ color: "var(--muted)" }}>
+                  Este anúncio ainda não recebeu avaliações. Seja o primeiro a alugar.
+                </p>
+              )}
             </div>
           </div>
 
-          {/* ============ PAINEL DE RESERVA ============ */}
           <aside>
             <div className="booking-box">
               <div className="booking-price">
@@ -193,8 +250,9 @@ export default function Product() {
               </div>
               <div className="booking-rating">
                 <Icon name="star" size="sm" />
-                {formatRating(product.rating)} · {product.reviews} avaliações · Cancelamento grátis
-                até 24h antes
+                {formatRating(product.rating)}
+                {product.reviews > 0 ? ` · ${product.reviews} avaliações` : " · anúncio novo"} ·
+                Cancelamento grátis até 24h antes
               </div>
 
               <div className="date-grid">
@@ -244,21 +302,33 @@ export default function Product() {
               <button
                 type="button"
                 className="btn btn-primary btn-lg btn-block"
-                onClick={() =>
+                onClick={() => {
+                  if (!user) {
+                    navigate("/login", { state: { from: location.pathname } });
+                    return;
+                  }
                   showToast(
                     "Reserva simulada!",
                     "O processo end-to-end de reserva e transação será entregue no Incremento 4 do projeto."
-                  )
-                }
+                  );
+                }}
               >
-                Solicitar reserva
+                {user ? "Solicitar reserva" : "Entrar para reservar"}
               </button>
               <p className="booking-note">
-                Você ainda não será cobrado — o locador precisa confirmar.
+                {user
+                  ? "Você ainda não será cobrado — o locador precisa confirmar."
+                  : "Você pode ver o item e simular o valor. Para alugar, entre na sua conta."}
               </p>
 
               <div className="owner-card">
-                <span className={`avatar ${product.owner.avatar}`}>{product.owner.initials}</span>
+                <span className={`avatar ${product.owner.avatar}`}>
+                  {product.owner.avatarUrl ? (
+                    <img src={product.owner.avatarUrl} alt="" />
+                  ) : (
+                    product.owner.initials
+                  )}
+                </span>
                 <div>
                   <strong>
                     {product.owner.name}
@@ -274,7 +344,7 @@ export default function Product() {
                   onClick={() =>
                     showToast(
                       "Chat em breve",
-                      "A conversa entre locador e locatário faz parte dos perfis de usuário — Incremento 1 do projeto."
+                      "A conversa entre locador e locatário fará parte do Incremento 4."
                     )
                   }
                 >
@@ -293,7 +363,6 @@ export default function Product() {
           </aside>
         </div>
 
-        {/* ============ SEMELHANTES ============ */}
         {similar.length > 0 && (
           <section className="section-tight">
             <div className="section-head">

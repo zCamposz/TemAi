@@ -4,6 +4,7 @@ import SearchBar from "../components/SearchBar";
 import ProductCard from "../components/ProductCard";
 import Icon, { Stars } from "../components/Icon";
 import { CATEGORIES, PRODUCTS } from "../data/catalog";
+import { useMergedProducts } from "../lib/products";
 
 const STEPS = [
   {
@@ -75,10 +76,13 @@ const FAQ = [
 ];
 
 export default function Home() {
-  const featured = PRODUCTS.filter((product) => product.featured);
+  const { products } = useMergedProducts();
+  const live = products.filter((product) => product.source === "supabase");
+  const featuredCatalog = PRODUCTS.filter((product) => product.featured);
+  const featured = [...live, ...featuredCatalog].slice(0, 8);
 
   return (
-    <Layout note="fase de Prototipagem do projeto Tem Aí? · As funcionalidades serão entregues de forma incremental">
+    <Layout note="Incrementos 1 a 3 concluídos · Incremento 4 planejado — reserva e transação">
       {/* ============ HERO ============ */}
       <section className="hero">
         <div className="container">
@@ -448,10 +452,9 @@ export default function Home() {
                 <Icon name="plus" />
               </summary>
               <p>
-                Este site é o protótipo navegável do projeto. As funcionalidades serão entregues de
-                forma incremental: autenticação e perfis, cadastro de produtos, busca com
-                geolocalização e, por fim, o processo completo de reserva e transação. Saiba mais na
-                página{" "}
+                Este site é o protótipo navegável do projeto. Já funcionam autenticação, cadastro de
+                produtos e busca por geolocalização. O Incremento 4 entregará o processo completo de
+                reserva e transação. Saiba mais na página{" "}
                 <Link to="/sobre" style={{ color: "var(--brand)", fontWeight: 600 }}>
                   Sobre o projeto
                 </Link>
