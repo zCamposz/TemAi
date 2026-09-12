@@ -61,6 +61,7 @@ export default function Explore() {
   const [onlyVerified, setOnlyVerified] = useState(false);
   const [sort, setSort] = useState("proximos");
   const [page, setPage] = useState(1);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const resultsRef = useRef(null);
 
@@ -213,7 +214,11 @@ export default function Explore() {
   ].filter((filter) => filter.when);
 
   const scrollToResults = () => {
-    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // No mobile o painel de filtros fecha antes da rolagem, para o layout assentar.
+    setFiltersOpen(false);
+    requestAnimationFrame(() => {
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
   const handleLocate = async () => {
@@ -275,7 +280,26 @@ export default function Explore() {
 
       <section className="container explore-layout">
         <aside className="explore-aside">
-          <div className="filters" aria-label="Filtros de busca">
+          <button
+            type="button"
+            className="filters-toggle"
+            aria-expanded={filtersOpen}
+            aria-controls="explore-filters"
+            onClick={() => setFiltersOpen((v) => !v)}
+          >
+            <Icon name="sliders" size="sm" />
+            Filtros
+            {activeFilters.length > 0 && (
+              <span className="filters-count">{activeFilters.length}</span>
+            )}
+            <Icon name="chevronDown" size="sm" className="chev" />
+          </button>
+
+          <div
+            className={filtersOpen ? "filters open" : "filters"}
+            id="explore-filters"
+            aria-label="Filtros de busca"
+          >
             <div className="filter-group">
               <h4>Distância</h4>
               <div className="range-wrap">
@@ -379,23 +403,23 @@ export default function Explore() {
               Limpar tudo
             </button>
           </div>
-
-          <div className="map-teaser">
-            <ResultsMap
-              origin={origin}
-              products={mapped}
-              selectedSlug={selectedSlug}
-              onSelect={handleSelectPin}
-            />
-            <p className="map-note">
-              <strong>Mapa dos resultados:</strong> o ponto amarelo é a origem da busca; os verdes
-              são anúncios dentro do raio de {maxDistance} km. O pin usa o CEP, não o endereço da
-              casa.
-            </p>
-          </div>
         </aside>
 
-        <div ref={resultsRef}>
+        <div className="map-teaser explore-map">
+          <ResultsMap
+            origin={origin}
+            products={mapped}
+            selectedSlug={selectedSlug}
+            onSelect={handleSelectPin}
+          />
+          <p className="map-note">
+            <strong>Mapa dos resultados:</strong> o ponto amarelo é a origem da busca; os verdes
+            são anúncios dentro do raio de {maxDistance} km. O pin usa o CEP, não o endereço da
+            casa.
+          </p>
+        </div>
+
+        <div ref={resultsRef} className="explore-results">
           <div className="explore-toolbar">
             <p>
               Mostrando{" "}

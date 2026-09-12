@@ -142,7 +142,7 @@ export default function Product() {
         </div>
 
         <div className="product-layout">
-          <div>
+          <div className="product-gallery">
             <div className={`gallery-main ${product.hue}${hasPhotos ? " has-photo" : ""}`}>
               {hasPhotos ? (
                 <img src={thumbs[activeThumb]} alt={product.title} />
@@ -170,7 +170,9 @@ export default function Product() {
                 </button>
               ))}
             </div>
+          </div>
 
+          <div className="product-details">
             <div className="detail-block">
               <h2>Descrição</h2>
               {product.description.map((paragraph) => (
@@ -242,7 +244,7 @@ export default function Product() {
             </div>
           </div>
 
-          <aside>
+          <aside className="product-booking">
             <div className="booking-box">
               <div className="booking-price">
                 <span className="price">{formatPrice(product.price)}</span>
