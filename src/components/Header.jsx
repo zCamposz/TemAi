@@ -32,14 +32,34 @@ export default function Header() {
   useEffect(() => setOpen(false), [location]);
 
   useEffect(() => {
+    document.body.classList.toggle("nav-open", open);
+    return () => document.body.classList.remove("nav-open");
+  }, [open]);
+
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth > 920) setOpen(false);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
     if (!open) return undefined;
     const onClickOutside = (e) => {
       if (!navRef.current?.contains(e.target) && !toggleRef.current?.contains(e.target)) {
         setOpen(false);
       }
     };
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("click", onClickOutside);
-    return () => document.removeEventListener("click", onClickOutside);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("click", onClickOutside);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   const exploreActive = location.pathname.startsWith("/produto");
@@ -51,6 +71,14 @@ export default function Header() {
 
   return (
     <header className={scrolled ? "site-header scrolled" : "site-header"}>
+      {open ? (
+        <button
+          type="button"
+          className="nav-overlay"
+          aria-label="Fechar menu"
+          onClick={() => setOpen(false)}
+        />
+      ) : null}
       <div className="container header-inner">
         <Link to="/" className="brand" aria-label="Tem Aí? — página inicial">
           <BrandMark />
@@ -61,6 +89,7 @@ export default function Header() {
 
         <nav
           ref={navRef}
+          id="main-nav"
           className={open ? "main-nav open" : "main-nav"}
           aria-label="Navegação principal"
         >
@@ -86,6 +115,22 @@ export default function Header() {
               </NavLink>
             );
           })}
+
+          <div className="nav-auth">
+            {user ? (
+              <>
+                <Link to="/perfil">Meu perfil</Link>
+                <button type="button" className="nav-signout" onClick={handleSignOut}>
+                  Sair da conta
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login">Entrar</Link>
+                <Link to="/cadastro">Criar conta</Link>
+              </>
+            )}
+          </div>
         </nav>
 
         <div className="header-actions">
@@ -104,19 +149,20 @@ export default function Header() {
               Entrar
             </Link>
           )}
-          <Link to="/anunciar" className="btn btn-primary">
+          <Link to="/anunciar" className="btn btn-primary header-announce" aria-label="Anunciar item">
             <Icon name="plus" size="sm" />
-            Anunciar item
+            <span className="hide-sm">Anunciar item</span>
           </Link>
           <button
             ref={toggleRef}
             type="button"
             className="nav-toggle"
-            aria-label="Abrir menu"
+            aria-label={open ? "Fechar menu" : "Abrir menu"}
             aria-expanded={open}
+            aria-controls="main-nav"
             onClick={() => setOpen((v) => !v)}
           >
-            <Icon name="menu" />
+            <Icon name={open ? "x" : "menu"} />
           </button>
         </div>
       </div>
