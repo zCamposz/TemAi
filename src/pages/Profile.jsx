@@ -4,7 +4,9 @@ import Layout from "../components/Layout";
 import Icon from "../components/Icon";
 import { useAuth } from "../components/AuthProvider";
 import { useToast } from "../components/ToastProvider";
+import { formatPrice } from "../data/catalog";
 import { getAuthErrorMessage, getInitials } from "../lib/authErrors";
+import { fetchMyProducts } from "../lib/products";
 
 export default function Profile() {
   const { user, profile, signOut, updateProfile } = useAuth();
@@ -15,6 +17,8 @@ export default function Profile() {
   const [telefone, setTelefone] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [listings, setListings] = useState([]);
+  const [listingsLoading, setListingsLoading] = useState(true);
 
   const displayName = profile?.nome ?? user?.user_metadata?.nome ?? "Usuário";
 
@@ -24,6 +28,26 @@ export default function Profile() {
       setTelefone(profile.telefone ?? "");
     }
   }, [profile]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let mounted = true;
+
+    (async () => {
+      try {
+        const mine = await fetchMyProducts(user.id);
+        if (mounted) setListings(mine);
+      } catch {
+        if (mounted) setListings([]);
+      } finally {
+        if (mounted) setListingsLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -60,7 +84,7 @@ export default function Profile() {
             <span>Meu perfil</span>
           </nav>
           <h1>Meu perfil</h1>
-          <p>Gerencie seus dados de conta e preferências de contato.</p>
+          <p>Gerencie seus dados de conta e os anúncios que você publicou.</p>
         </div>
       </section>
 
@@ -134,6 +158,42 @@ export default function Profile() {
             </button>
           </div>
         </form>
+
+        <section className="form-card">
+          <h2>Meus anúncios</h2>
+          {listingsLoading ? (
+            <p style={{ color: "var(--muted)" }}>Carregando anúncios…</p>
+          ) : listings.length === 0 ? (
+            <p style={{ color: "var(--muted)" }}>
+              Você ainda não anunciou nenhum item.{" "}
+              <Link to="/anunciar">Publicar o primeiro anúncio</Link>
+            </p>
+          ) : (
+            <ul className="listing-list">
+              {listings.map((item) => (
+                <li key={item.id}>
+                  <Link className="listing-row" to={`/produto/${item.slug}`}>
+                    {item.photos?.[0] ? (
+                      <img src={item.photos[0]} alt="" />
+                    ) : (
+                      <span className={`listing-thumb ${item.hue}`}>
+                        <Icon name={item.icon} />
+                      </span>
+                    )}
+                    <div>
+                      <h3>{item.title}</h3>
+                      <p>
+                        {item.status === "publicado" ? "Publicado" : "Rascunho"} ·{" "}
+                        {formatPrice(item.price)}/dia · {item.neighborhood}
+                      </p>
+                    </div>
+                    <span className="btn btn-outline btn-sm">Ver</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </Layout>
   );

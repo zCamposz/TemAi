@@ -70,7 +70,7 @@ const INCREMENTS = [
 
 export default function About() {
   return (
-    <Layout note="Incremento 1 concluído · Incremento 2 em andamento — cadastro de produtos">
+    <Layout note="Incrementos 1 a 3 concluídos · Incremento 4 planejado — reserva e transação">
       <section className="page-hero">
         <div className="container">
           <nav className="breadcrumb" aria-label="Trilha de navegação">
@@ -232,8 +232,8 @@ export default function About() {
 
             {INCREMENTS.map((increment, index) => {
               const num = index + 1;
-              const isDone = num === 1;
-              const isCurrent = num === 2;
+              const isDone = num <= 3;
+              const isCurrent = num === 4;
               const itemClass = ["tl-item", isDone && "done", isCurrent && "current"]
                 .filter(Boolean)
                 .join(" ");
@@ -291,8 +291,8 @@ export default function About() {
             <div>
               <h2>Explore o Tem Aí?</h2>
               <p>
-                O Incremento 1 já entrega login, cadastro e perfil. Agora estamos no Incremento 2:
-                cadastro real de produtos com especificações detalhadas.
+                Os Incrementos 1 a 3 já entregam login, anúncios reais e busca por proximidade. O
+                próximo passo é o Incremento 4: reserva e transação.
               </p>
               <div className="cta-actions">
                 <Link to="/explorar" className="btn btn-accent btn-lg">
@@ -310,11 +310,15 @@ export default function About() {
               </li>
               <li>
                 <Icon name="checkCircle" />
-                Busca e listagem de itens
+                Publicação de anúncios com fotos e especificações
               </li>
               <li>
                 <Icon name="checkCircle" />
                 Página de produto com simulação de reserva
+              </li>
+              <li>
+                <Icon name="checkCircle" />
+                Busca por proximidade, raio e mapa de resultados
               </li>
             </ul>
           </div>

@@ -6,14 +6,23 @@ import { formatDistance, formatPrice, formatRating } from "../data/catalog";
 export default function ProductCard({ product }) {
   const [favorite, setFavorite] = useState(false);
   const href = `/produto/${product.slug}`;
+  const cover = product.photos?.[0];
 
   return (
     <article className="product-card">
-      <Link className={`card-media ${product.hue}`} to={href} aria-label={`Ver ${product.title}`}>
+      <Link
+        className={`card-media ${product.hue}${cover ? " has-photo" : ""}`}
+        to={href}
+        aria-label={`Ver ${product.title}`}
+      >
         {product.badge && <span className="card-badge">{product.badge}</span>}
-        <span className="media-icon">
-          <Icon name={product.icon} size="lg" />
-        </span>
+        {cover ? (
+          <img src={cover} alt="" />
+        ) : (
+          <span className="media-icon">
+            <Icon name={product.icon} size="lg" />
+          </span>
+        )}
       </Link>
 
       <button

@@ -14,7 +14,7 @@ if (!isSupabaseConfigured && import.meta.env.DEV) {
 
 /**
  * Cliente Supabase compartilhado pelo app.
- * Auth, perfis e demais recursos do Incremento 1 usam esta instância.
+ * Auth, perfis, anúncios e Storage usam esta instância.
  */
 export const supabase = createClient(
   supabaseUrl ?? "https://placeholder.supabase.co",

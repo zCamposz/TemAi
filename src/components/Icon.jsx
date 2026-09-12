@@ -187,6 +187,16 @@ const ICONS = {
   ),
   chevronLeft: <polyline points="15 18 9 12 15 6" />,
   chevronRight: <polyline points="9 18 15 12 9 6" />,
+  locate: (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <circle cx="12" cy="12" r="8" />
+      <line x1="12" y1="1" x2="12" y2="4" />
+      <line x1="12" y1="20" x2="12" y2="23" />
+      <line x1="1" y1="12" x2="4" y2="12" />
+      <line x1="20" y1="12" x2="23" y2="12" />
+    </>
+  ),
 };
 
 export default function Icon({ name, size, className = "", ...rest }) {

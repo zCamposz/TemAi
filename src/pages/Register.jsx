@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/AuthLayout";
 import { useAuth } from "../components/AuthProvider";
 import { GoogleMark } from "../components/Icon";
@@ -16,12 +16,14 @@ export default function Register() {
   const { user, loading, isConfigured, signUp } = useAuth();
   const showToast = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = location.state?.from ?? "/";
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!loading && user) navigate("/", { replace: true });
-  }, [loading, user, navigate]);
+    if (!loading && user) navigate(redirectTo, { replace: true });
+  }, [loading, user, navigate, redirectTo]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -46,9 +48,17 @@ export default function Register() {
 
     setSubmitting(true);
     try {
-      await signUp({ nome, email, telefone, password: senha });
-      showToast("Conta criada!", "Bem-vindo(a) ao Tem Aí?");
-      navigate("/", { replace: true });
+      const data = await signUp({ nome, email, telefone, password: senha });
+      if (data?.session) {
+        showToast("Conta criada!", "Bem-vindo(a) ao Tem Aí?");
+        navigate(redirectTo, { replace: true });
+      } else {
+        showToast(
+          "Confirme seu e-mail",
+          "Enviamos um link de confirmação. Depois disso, entre com seu e-mail e senha."
+        );
+        navigate("/login", { replace: true, state: { from: redirectTo } });
+      }
     } catch (err) {
       setError(getAuthErrorMessage(err));
     } finally {
@@ -175,7 +185,10 @@ export default function Register() {
       </form>
 
       <p className="auth-switch">
-        Já tem uma conta? <Link to="/login">Entrar</Link>
+        Já tem uma conta?{" "}
+        <Link to="/login" state={{ from: redirectTo }}>
+          Entrar
+        </Link>
       </p>
     </AuthLayout>
   );

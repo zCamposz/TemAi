@@ -89,7 +89,7 @@ export default function Header() {
         </nav>
 
         <div className="header-actions">
-          {!loading && user ? (
+          {user ? (
             <>
               <Link to="/perfil" className="header-user" title={displayName}>
                 <span className="avatar header-avatar">{getInitials(displayName)}</span>
@@ -99,7 +99,7 @@ export default function Header() {
                 Sair
               </button>
             </>
-          ) : (
+          ) : loading ? null : (
             <Link to="/login" className="btn btn-ghost">
               Entrar
             </Link>

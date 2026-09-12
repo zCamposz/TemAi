@@ -44,30 +44,18 @@ export default function AuthProvider({ children }) {
 
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        loadProfile(currentUser.id).finally(() => {
-          if (mounted) setLoading(false);
-        });
-      } else {
-        setLoading(false);
-      }
-    });
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
       const currentUser = session?.user ?? null;
       setUser(currentUser);
+      setLoading(false);
       if (currentUser) {
         loadProfile(currentUser.id);
       } else {
         setProfile(null);
       }
-      setLoading(false);
     });
 
     return () => {
@@ -76,25 +64,45 @@ export default function AuthProvider({ children }) {
     };
   }, [loadProfile]);
 
-  const signIn = useCallback(async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-  }, []);
+  const signIn = useCallback(
+    async (email, password) => {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (!data.session?.user) {
+        throw new Error("Sessão não iniciada. Confirme seu e-mail e tente novamente.");
+      }
+      setUser(data.user);
+      setLoading(false);
+      loadProfile(data.user.id);
+      return data;
+    },
+    [loadProfile]
+  );
 
-  const signUp = useCallback(async ({ nome, email, telefone, password }) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { nome, telefone },
-      },
-    });
-    if (error) throw error;
-  }, []);
+  const signUp = useCallback(
+    async ({ nome, email, telefone, password }) => {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { nome, telefone },
+        },
+      });
+      if (error) throw error;
+      if (data.session?.user) {
+        setUser(data.user);
+        setLoading(false);
+        loadProfile(data.user.id);
+      }
+      return data;
+    },
+    [loadProfile]
+  );
 
   const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    setUser(null);
     setProfile(null);
   }, []);
 
