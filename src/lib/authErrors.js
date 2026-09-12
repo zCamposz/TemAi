@@ -22,6 +22,12 @@ export function getAuthErrorMessage(error) {
   if (msg.includes("signup is disabled")) {
     return "Novos cadastros estão temporariamente desativados.";
   }
+  if (msg.includes("row-level security")) {
+    return "Não foi possível salvar. Confira se você está logado e se o schema do Incremento 2 foi executado no Supabase.";
+  }
+  if (msg.includes("bucket not found") || msg.includes("product-photos")) {
+    return "O armazenamento de fotos ainda não foi configurado. Execute o schema.sql no Supabase.";
+  }
 
   return error.message;
 }

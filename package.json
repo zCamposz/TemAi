@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Tem Aí? — marketplace de aluguel de bens de uso esporádico (Incremento 2 em andamento)",
+  "description": "Tem Aí? — marketplace de aluguel de bens de uso esporádico (Incremento 3 concluído)",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",
+    "leaflet": "^1.9.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0"

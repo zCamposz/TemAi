@@ -1,8 +1,11 @@
 import { Link } from "react-router-dom";
+import { useAuth } from "./AuthProvider";
 import { BrandMark } from "./Icon";
 import { TEAM } from "../data/catalog";
 
 export default function Footer() {
+  const { user } = useAuth();
+
   return (
     <footer className="site-footer">
       <div className="container">
@@ -41,12 +44,25 @@ export default function Footer() {
           <div className="footer-col">
             <h4>Conta</h4>
             <ul>
-              <li>
-                <Link to="/login">Entrar</Link>
-              </li>
-              <li>
-                <Link to="/cadastro">Criar conta</Link>
-              </li>
+              {user ? (
+                <>
+                  <li>
+                    <Link to="/perfil">Meu perfil</Link>
+                  </li>
+                  <li>
+                    <Link to="/anunciar">Anunciar item</Link>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    <Link to="/login">Entrar</Link>
+                  </li>
+                  <li>
+                    <Link to="/cadastro">Criar conta</Link>
+                  </li>
+                </>
+              )}
               <li>
                 <Link to="/#faq">Dúvidas frequentes</Link>
               </li>

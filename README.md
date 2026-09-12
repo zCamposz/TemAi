@@ -2,7 +2,7 @@
 
 Plataforma de marketplace baseada nos princípios da **economia circular e colaborativa** para aluguel sob demanda de bens de uso esporádico (ferramentas elétricas, maquinário para eventos etc.). O projeto atua diretamente no **ODS 12 — Consumo e Produção Responsáveis** (Agenda 2030, ONU).
 
-O projeto segue entrega **incremental**. A fase de **Prototipagem** e o **Incremento 1** (autenticação e perfis com Supabase) estão concluídos. **Fase atual: Incremento 2** — cadastro de produtos com especificações detalhadas.
+O projeto segue entrega **incremental**. A fase de **Prototipagem** e os **Incrementos 1, 2 e 3** (autenticação, anúncios e busca por geolocalização) estão concluídos. **Próxima fase: Incremento 4** — reserva e transação.
 
 ## Como rodar
 
@@ -28,7 +28,8 @@ Outros comandos disponíveis:
 - **React Router** (modo hash) para a navegação entre telas
 - **Vite** como servidor de desenvolvimento e empacotador
 - **CSS puro** com variáveis, sem framework de estilo
-- **Supabase** (Incremento 1+) — autenticação, banco PostgreSQL e perfis de usuário
+- **Supabase** (Incremento 1+) — autenticação, banco PostgreSQL, PostGIS, perfis, anúncios e Storage de fotos
+- **Leaflet** + mapa de ruas da Esri (dados OpenStreetMap) em `/explorar`
 
 O roteamento usa `HashRouter` de propósito: as URLs ficam no formato `/#/explorar`, o que permite publicar o site em qualquer hospedagem estática (GitHub Pages incluso) sem precisar configurar redirecionamentos no servidor.
 
@@ -43,26 +44,33 @@ temai/
     ├── main.jsx            # Monta a aplicação
     ├── App.jsx             # Rotas e controle de rolagem
     ├── styles.css          # Design system e estilos de todas as telas
+    ├── lib/
+    │   ├── supabase.js     # Cliente Supabase compartilhado
+    │   ├── authErrors.js   # Mensagens de erro e iniciais
+    │   ├── geo.js          # CEP, lugar, GPS e distância
+    │   └── products.js     # Anúncios: fetch, upload de fotos e insert
     ├── data/
-    │   └── catalog.js      # Produtos, categorias, avaliações e equipe
+    │   └── catalog.js      # Catálogo de demonstração, categorias e equipe
     ├── components/
     │   ├── Layout.jsx      # Aviso de protótipo + cabeçalho + rodapé
     │   ├── Header.jsx      # Navegação principal e menu mobile
     │   ├── Footer.jsx
     │   ├── AuthProvider.jsx  # Sessão e autenticação Supabase
+    │   ├── ProtectedRoute.jsx # Exige login em /perfil e /anunciar
     │   ├── AuthLayout.jsx  # Estrutura das telas de login e cadastro
     │   ├── ProductCard.jsx # Card de item reutilizado em 3 telas
     │   ├── SearchBar.jsx   # Campo de busca que leva para /explorar
+    │   ├── ResultsMap.jsx  # Mapa Leaflet dos resultados
     │   ├── Icon.jsx        # Biblioteca de ícones SVG
     │   └── ToastProvider.jsx
     └── pages/
         ├── Home.jsx        # Hero, categorias, destaques, ODS 12 e FAQ
-        ├── Explore.jsx     # Busca com filtros funcionais e paginação
+        ├── Explore.jsx     # Busca por raio, filtros combinados, mapa e paginação
         ├── Product.jsx     # Detalhe do item com cálculo de reserva
         ├── Login.jsx
         ├── Register.jsx
-        ├── Profile.jsx     # Perfil do usuário (Incremento 1)
-        ├── Announce.jsx    # Cadastro de item + simulador de ganhos
+        ├── Profile.jsx     # Perfil + lista dos anúncios do usuário
+        ├── Announce.jsx    # Publicação real de anúncios (Incremento 2)
         └── About.jsx       # Projeto, metodologia, ODS 12 e equipe
 ```
 
@@ -73,21 +81,27 @@ Cada tela do protótipo antecipa um incremento do desenvolvimento:
 | Incremento | Funcionalidade | Rota | Status |
 | --- | --- | --- | --- |
 | 1 | Autenticação e perfis de usuário | `/login`, `/cadastro`, `/perfil` | Concluído |
-| 2 | Cadastro de produtos com especificações detalhadas | `/anunciar` | **Em andamento** |
-| 3 | Pesquisa otimizada com filtragem por geolocalização | `/explorar` | Planejado |
+| 2 | Cadastro de produtos com especificações detalhadas | `/anunciar` | Concluído |
+| 3 | Pesquisa otimizada com filtragem por geolocalização | `/explorar` | Concluído |
 | 4 | Processo end-to-end de reserva e transação | `/produto/:slug` | Planejado |
 
 **Incremento 1 (concluído):** cadastro, login, logout, sessão persistente, perfil editável e rotas protegidas.
 
-**Incremento 2 (atual):** publicação real de anúncios com fotos, especificações e preços no Supabase.
+**Incremento 2 (concluído):** publicação real de anúncios com fotos, especificações, preço, caução e condições de entrega no Supabase. Os anúncios publicados aparecem em `/explorar`, `/` e `/produto/:slug`.
 
-As ações dos incrementos ainda não entregues (publicar anúncio, busca por geolocalização, reserva) exibem um aviso indicando em qual etapa a funcionalidade será implementada.
+**Incremento 3 (concluído):** origem da busca (GPS, CEP ou bairro), raio em km, distância real até o anúncio, mapa de resultados e filtros combinados. O pin público usa o CEP (não o endereço da casa); clicar na bolinha abre o produto. Anúncios no mesmo ponto aparecem espalhados para não se sobrepor.
+
+As ações do incremento ainda não entregue (reserva) exibem um aviso indicando em qual etapa a funcionalidade será implementada.
 
 O que já funciona de verdade:
 
 - autenticação e perfis de usuário (Supabase);
-- busca textual por nome e categoria, ignorando acentos (dados de demonstração em `src/data/catalog.js`);
-- filtros combinados de categoria, distância, faixa de preço, avaliação, entrega e locador verificado;
+- cadastro de produtos com fotos e especificações detalhadas;
+- geocodificação do CEP na publicação do anúncio (`lat` / `lng`);
+- busca textual por nome e categoria, ignorando acentos (anúncios reais + demonstração em `src/data/catalog.js`);
+- origem da busca por geolocalização do navegador, bairro/cidade ou CEP;
+- filtros combinados de categoria, **raio em km**, faixa de preço, avaliação, entrega e locador verificado;
+- mapa dos resultados (Leaflet + Esri) com a origem, os anúncios no raio e clique no pin para abrir o produto;
 - ordenação por proximidade, preço, avaliação e número de aluguéis;
 - paginação dos resultados;
 - cálculo da reserva conforme as datas escolhidas (diárias, taxa de serviço e caução);
@@ -111,11 +125,11 @@ O Incremento 1 usa [Supabase](https://supabase.com) (plano gratuito) para autent
 2. **New project** → escolha um nome (ex.: `temai`), senha do banco e região (ex.: South America).
 3. Aguarde o projeto ficar pronto (~2 min).
 
-### 2. Criar tabela de perfis
+### 2. Criar tabelas (schema)
 
 1. No dashboard: **SQL Editor** → **New query**.
-2. Copie e execute o conteúdo de [`supabase/schema.sql`](supabase/schema.sql).
-3. Confira em **Table Editor** se a tabela `profiles` apareceu.
+2. Copie e execute o conteúdo de [`supabase/schema.sql`](supabase/schema.sql). O script é idempotente: pode rodar de novo (Incremento 3 acrescenta colunas de geolocalização em `products`, sem recriar a tabela).
+3. Confira em **Table Editor** se `profiles` e `products` apareceram (com `lat` / `lng` / `location`), e em **Storage** se o bucket `product-photos` foi criado.
 
 ### 3. Configurar variáveis de ambiente
 
@@ -160,7 +174,9 @@ Defina as mesmas variáveis `VITE_SUPABASE_*` no ambiente de build (Secrets do G
 | --- | --- |
 | `src/lib/supabase.js` | Cliente Supabase compartilhado |
 | `.env.example` | Modelo das variáveis de ambiente |
-| `supabase/schema.sql` | Schema da tabela `profiles` + RLS + triggers |
+| `supabase/schema.sql` | Schema de `profiles` e `products` + Storage + RLS + PostGIS + triggers |
+| `src/lib/products.js` | Leitura, upload de fotos e publicação de anúncios |
+| `src/lib/geo.js` | Geocodificação de CEP/lugar, GPS e cálculo de distância |
 
 ### Modelo de dados (Incremento 1)
 
@@ -171,6 +187,29 @@ Defina as mesmas variáveis `VITE_SUPABASE_*` no ambiente de build (Secrets do G
 | `profiles.telefone` | Cadastro | Contato para retirada/devolução |
 | `profiles.avatar_url` | Perfil (futuro) | Foto do usuário |
 | `profiles.verificado` | Admin/futuro fluxo | Badge “locador verificado” em `/explorar` |
+
+### Modelo de dados (Incremento 2)
+
+| Campo | Origem | Uso |
+| --- | --- | --- |
+| `products.titulo` | `/anunciar` | Nome do anúncio e busca |
+| `products.categoria` / `estado` | Formulário | Filtros e especificações |
+| `products.marca` / `modelo` / `voltagem` | Formulário | Especificações técnicas |
+| `products.preco_dia` / `caucao` | Formulário | Preço do card e cálculo da reserva |
+| `products.fotos` | Storage `product-photos` | Capa e galeria |
+| `products.bairro` / `cidade` / `cep` | Formulário | Localização pública (bairro) |
+| `products.status` | Publicar ou rascunho | Só `publicado` aparece na busca |
+
+### Modelo de dados (Incremento 3)
+
+| Campo | Origem | Uso |
+| --- | --- | --- |
+| `products.lat` / `lng` | Geocodificação do CEP em `/anunciar` | Distância e pin no mapa |
+| `products.location` | Trigger PostGIS a partir de lat/lng | `ST_DWithin` na função `search_products_near` |
+
+Depois de puxar este código, rode de novo o [`supabase/schema.sql`](supabase/schema.sql) no SQL Editor (é idempotente). Sem as colunas `lat`/`lng`, a publicação do anúncio ainda funciona, mas a busca por raio usa só o catálogo de demonstração.
+
+Anúncios publicados **antes** do Incremento 3 não têm coordenadas. Edite e salve de novo (com CEP) para entrar no mapa.
 
 ## Equipe
 

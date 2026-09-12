@@ -23,8 +23,8 @@ export default function Login() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!loading && user) navigate("/", { replace: true });
-  }, [loading, user, navigate]);
+    if (!loading && user) navigate(redirectTo, { replace: true });
+  }, [loading, user, navigate, redirectTo]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -133,7 +133,10 @@ export default function Login() {
       </form>
 
       <p className="auth-switch">
-        Ainda não tem conta? <Link to="/cadastro">Cadastre-se grátis</Link>
+        Ainda não tem conta?{" "}
+        <Link to="/cadastro" state={{ from: redirectTo }}>
+          Cadastre-se grátis
+        </Link>
       </p>
     </AuthLayout>
   );
