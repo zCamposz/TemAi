@@ -33,6 +33,9 @@ export default function Footer() {
                 <Link to="/explorar">Explorar itens</Link>
               </li>
               <li>
+                <Link to="/ecopontos">Ecopontos</Link>
+              </li>
+              <li>
                 <Link to="/anunciar">Anunciar item</Link>
               </li>
               <li>

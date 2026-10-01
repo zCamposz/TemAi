@@ -94,11 +94,12 @@ async function geocodePhoton(query) {
   return preferBrazil(hits) ?? hits[0] ?? null;
 }
 
-/** CEP brasileiro → bairro, cidade e coordenadas (BrasilAPI, com fallback). */
+/** CEP brasileiro → logradouro, bairro, cidade e coordenadas (BrasilAPI, com fallback). */
 export async function geocodeCep(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
   if (digits.length !== 8) return null;
 
+  let logradouro = "";
   let bairro = "";
   let cidade = "";
 
@@ -106,27 +107,29 @@ export async function geocodeCep(raw) {
     const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${digits}`);
     if (response.ok) {
       const data = await response.json();
+      logradouro = data.street || "";
       bairro = data.neighborhood || "";
       cidade = data.city || "";
       const lat = parseCoord(data.location?.coordinates?.latitude);
       const lng = parseCoord(data.location?.coordinates?.longitude);
       const label = [bairro, cidade].filter(Boolean).join(", ") || `CEP ${digits}`;
       if (lat != null && lng != null) {
-        return { cep: digits, bairro, cidade, lat, lng, label };
+        return { cep: digits, logradouro, bairro, cidade, lat, lng, label };
       }
     }
   } catch {
     /* tenta ViaCEP + geocode textual */
   }
 
-  if (!bairro && !cidade) {
+  if (!logradouro || !bairro || !cidade) {
     try {
       const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
       if (response.ok) {
         const data = await response.json();
         if (!data.erro) {
-          bairro = data.bairro || "";
-          cidade = data.localidade || "";
+          logradouro = logradouro || data.logradouro || "";
+          bairro = bairro || data.bairro || "";
+          cidade = cidade || data.localidade || "";
         }
       }
     } catch {
@@ -153,12 +156,27 @@ export async function geocodeCep(raw) {
 
   return {
     cep: digits,
+    logradouro: logradouro || "",
     bairro: bairro || "",
     cidade: cidade || "",
     lat: place?.lat ?? null,
     lng: place?.lng ?? null,
     label: place?.label || [bairro, cidade].filter(Boolean).join(", ") || `CEP ${digits}`,
   };
+}
+
+/** Origem das recomendações: coordenadas do perfil ou Vila Mariana. O rótulo não leva o endereço da casa. */
+export function originFromProfile(profile) {
+  const lat = profile?.lat != null ? Number(profile.lat) : null;
+  const lng = profile?.lng != null ? Number(profile.lng) : null;
+  if (!isUsableCoord(lat, lng)) return DEFAULT_ORIGIN;
+
+  const label = [profile.bairro, profile.cidade].filter(Boolean).join(", ") || "Seu endereço";
+  return { lat, lng, label };
+}
+
+export function hasProfileOrigin(profile) {
+  return originFromProfile(profile) !== DEFAULT_ORIGIN;
 }
 
 /** Texto livre (bairro, cidade ou CEP) → ponto. */

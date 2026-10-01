@@ -7,6 +7,7 @@ import { getInitials } from "../lib/authErrors";
 const LINKS = [
   { to: "/", label: "Início", end: true },
   { to: "/explorar", label: "Explorar" },
+  { to: "/ecopontos", label: "Ecopontos" },
   { to: "/#como-funciona", label: "Como funciona" },
   { to: "/#sustentabilidade", label: "Sustentabilidade" },
   { to: "/sobre", label: "Sobre o projeto" },

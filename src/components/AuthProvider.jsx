@@ -11,15 +11,10 @@ export function useAuth() {
   return ctx;
 }
 
-async function fetchProfile(userId) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .single();
-
+async function fetchProfile() {
+  const { data, error } = await supabase.rpc("get_own_profile");
   if (error) throw error;
-  return data;
+  return Array.isArray(data) ? (data[0] ?? null) : data;
 }
 
 export default function AuthProvider({ children }) {
@@ -27,9 +22,9 @@ export default function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = useCallback(async (userId) => {
+  const loadProfile = useCallback(async () => {
     try {
-      const data = await fetchProfile(userId);
+      const data = await fetchProfile();
       setProfile(data);
     } catch {
       setProfile(null);
@@ -52,7 +47,7 @@ export default function AuthProvider({ children }) {
       setUser(currentUser);
       setLoading(false);
       if (currentUser) {
-        loadProfile(currentUser.id);
+        loadProfile();
       } else {
         setProfile(null);
       }
@@ -73,26 +68,36 @@ export default function AuthProvider({ children }) {
       }
       setUser(data.user);
       setLoading(false);
-      loadProfile(data.user.id);
+      loadProfile();
       return data;
     },
     [loadProfile]
   );
 
   const signUp = useCallback(
-    async ({ nome, email, telefone, password }) => {
+    async ({ nome, email, telefone, password, endereco }) => {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { nome, telefone },
+          data: {
+            nome,
+            telefone,
+            cep: endereco?.cep ?? null,
+            logradouro: endereco?.logradouro ?? null,
+            numero: endereco?.numero ?? null,
+            bairro: endereco?.bairro ?? null,
+            cidade: endereco?.cidade ?? null,
+            lat: endereco?.lat ?? null,
+            lng: endereco?.lng ?? null,
+          },
         },
       });
       if (error) throw error;
       if (data.session?.user) {
         setUser(data.user);
         setLoading(false);
-        loadProfile(data.user.id);
+        loadProfile();
       }
       return data;
     },
@@ -107,17 +112,24 @@ export default function AuthProvider({ children }) {
   }, []);
 
   const updateProfile = useCallback(
-    async ({ nome, telefone }) => {
+    async ({ nome, telefone, endereco }) => {
       if (!user) throw new Error("Usuário não autenticado");
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .update({ nome, telefone })
-        .eq("id", user.id)
-        .select()
-        .single();
+      const payload = { nome, telefone };
+      if (endereco) {
+        payload.cep = endereco.cep;
+        payload.logradouro = endereco.logradouro;
+        payload.numero = endereco.numero;
+        payload.bairro = endereco.bairro;
+        payload.cidade = endereco.cidade;
+        payload.lat = endereco.lat;
+        payload.lng = endereco.lng;
+      }
 
+      const { error } = await supabase.from("profiles").update(payload).eq("id", user.id);
       if (error) throw error;
+
+      const data = await fetchProfile();
       setProfile(data);
       return data;
     },

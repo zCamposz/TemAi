@@ -100,6 +100,7 @@ O que já funciona de verdade:
 - geocodificação do CEP na publicação do anúncio (`lat` / `lng`);
 - busca textual por nome e categoria, ignorando acentos (anúncios reais + demonstração em `src/data/catalog.js`);
 - origem da busca por geolocalização do navegador, bairro/cidade ou CEP;
+- endereço do perfil (CEP, logradouro, número, bairro e cidade) como origem padrão de itens e ecopontos para quem está logado;
 - filtros combinados de categoria, **raio em km**, faixa de preço, avaliação, entrega e locador verificado;
 - mapa dos resultados (Leaflet + Esri) com a origem, os anúncios no raio e clique no pin para abrir o produto;
 - ordenação por proximidade, preço, avaliação e número de aluguéis;
@@ -128,8 +129,8 @@ O Incremento 1 usa [Supabase](https://supabase.com) (plano gratuito) para autent
 ### 2. Criar tabelas (schema)
 
 1. No dashboard: **SQL Editor** → **New query**.
-2. Copie e execute o conteúdo de [`supabase/schema.sql`](supabase/schema.sql). O script é idempotente: pode rodar de novo (Incremento 3 acrescenta colunas de geolocalização em `products`, sem recriar a tabela).
-3. Confira em **Table Editor** se `profiles` e `products` apareceram (com `lat` / `lng` / `location`), e em **Storage** se o bucket `product-photos` foi criado.
+2. Copie e execute o conteúdo de [`supabase/schema.sql`](supabase/schema.sql). O script é idempotente: pode rodar de novo (acrescenta colunas de geolocalização em `products` e o endereço em `profiles`, sem recriar as tabelas).
+3. Confira em **Table Editor** se `profiles` e `products` apareceram (com `lat` / `lng`), e em **Storage** se o bucket `product-photos` foi criado.
 
 ### 3. Configurar variáveis de ambiente
 
@@ -187,6 +188,10 @@ Defina as mesmas variáveis `VITE_SUPABASE_*` no ambiente de build (Secrets do G
 | `profiles.telefone` | Cadastro | Contato para retirada/devolução |
 | `profiles.avatar_url` | Perfil (futuro) | Foto do usuário |
 | `profiles.verificado` | Admin/futuro fluxo | Badge “locador verificado” em `/explorar` |
+| `profiles.cep` / `logradouro` / `numero` / `bairro` / `cidade` | Cadastro e `/perfil` | Endereço da casa. Só o dono lê (`get_own_profile`). Não aparece em anúncio, card, mapa nem na URL |
+| `profiles.lat` / `lng` | Geocodificação do CEP do perfil | Origem padrão das recomendações de itens e ecopontos. Não são públicos |
+
+Logradouro, número, CEP e coordenadas do perfil **não são públicos**. Visitantes e outros usuários autenticados continuam vendo nome, telefone, avatar e verificação. Quem não tem endereço no perfil segue com a origem de Vila Mariana nos itens e sem ordenação por proximidade nos ecopontos.
 
 ### Modelo de dados (Incremento 2)
 

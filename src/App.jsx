@@ -11,6 +11,7 @@ import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import Announce from "./pages/Announce";
 import About from "./pages/About";
+import Ecopontos from "./pages/Ecopontos";
 
 /** Rola para o topo a cada navegação, ou para a seção quando há âncora. */
 function ScrollManager() {
@@ -39,6 +40,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/explorar" element={<Explore />} />
+            <Route path="/ecopontos" element={<Ecopontos />} />
             <Route path="/produto/:slug" element={<Product />} />
             <Route path="/login" element={<Login />} />
             <Route path="/cadastro" element={<Register />} />
