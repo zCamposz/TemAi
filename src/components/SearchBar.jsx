@@ -10,6 +10,7 @@ export default function SearchBar({
   placePlaceholder = "Perto de onde?",
   large = false,
   className = "",
+  placeNote = "",
 }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState(initialQuery);
@@ -90,6 +91,7 @@ export default function SearchBar({
       </button>
     </form>
     {locateError ? <p className="search-locate-error">{locateError}</p> : null}
+    {placeNote && !place.trim() ? <p className="origin-status">{placeNote}</p> : null}
     </div>
   );
 }

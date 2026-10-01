@@ -3,7 +3,9 @@ import Layout from "../components/Layout";
 import SearchBar from "../components/SearchBar";
 import ProductCard from "../components/ProductCard";
 import Icon, { Stars } from "../components/Icon";
+import { useAuth } from "../components/AuthProvider";
 import { CATEGORIES, PRODUCTS } from "../data/catalog";
+import { hasProfileOrigin, originFromProfile } from "../lib/geo";
 import { useMergedProducts } from "../lib/products";
 
 const STEPS = [
@@ -76,6 +78,9 @@ const FAQ = [
 ];
 
 export default function Home() {
+  const { profile } = useAuth();
+  const origin = originFromProfile(profile);
+  const fromProfile = hasProfileOrigin(profile);
   const { products } = useMergedProducts();
   const live = products.filter((product) => product.source === "supabase");
   const featuredCatalog = PRODUCTS.filter((product) => product.featured);
@@ -106,6 +111,7 @@ export default function Home() {
                 large
                 className="fade-up d3"
                 queryPlaceholder="O que você precisa? Ex.: furadeira, tenda 3x3..."
+                placeNote={fromProfile ? `Sem um lugar na busca, usamos ${origin.label}.` : ""}
               />
 
               <div className="hero-chips fade-up d4">
@@ -257,7 +263,11 @@ export default function Home() {
           <div className="section-head">
             <span className="eyebrow">Em destaque</span>
             <h2>Itens bem avaliados perto de você</h2>
-            <p>Uma amostra do que a comunidade da Vila Mariana e região está compartilhando agora.</p>
+            <p>
+              {fromProfile
+                ? `Uma amostra do que está mais perto de ${origin.label}.`
+                : "Uma amostra do que a comunidade da Vila Mariana e região está compartilhando agora."}
+            </p>
           </div>
 
           <div className="product-grid">

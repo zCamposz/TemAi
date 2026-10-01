@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "../components/AuthProvider";
 import Layout from "../components/Layout";
 import SearchBar from "../components/SearchBar";
 import ProductCard from "../components/ProductCard";
@@ -11,6 +12,8 @@ import {
   DEFAULT_ORIGIN,
   geocodePlace,
   getBrowserLocation,
+  hasProfileOrigin,
+  originFromProfile,
   parseOriginParams,
   withDistance,
 } from "../lib/geo";
@@ -39,6 +42,8 @@ const normalize = (text) =>
     .replace(/[\u0300-\u036f]/g, "");
 
 export default function Explore() {
+  const { profile } = useAuth();
+  const profileOrigin = originFromProfile(profile);
   const { products, loading } = useMergedProducts();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -78,8 +83,14 @@ export default function Explore() {
     }
 
     const local = placeParam.trim();
-    if (!local || local === DEFAULT_ORIGIN.label) {
+    if (local === DEFAULT_ORIGIN.label) {
       setOrigin(DEFAULT_ORIGIN);
+      setOriginStatus("");
+      return undefined;
+    }
+
+    if (!local) {
+      setOrigin(originFromProfile(profile));
       setOriginStatus("");
       return undefined;
     }
@@ -101,7 +112,7 @@ export default function Explore() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, placeParam]);
+  }, [searchParams, placeParam, profile]);
 
   useEffect(() => {
     if (!origin) return undefined;
@@ -263,9 +274,14 @@ export default function Explore() {
 
           <SearchBar
             initialQuery={query}
-            initialPlace={placeParam || origin?.label || ""}
+            initialPlace={placeParam}
             placePlaceholder="Vila Mariana, São Paulo"
             className="explore-search"
+            placeNote={
+              !placeParam.trim() && !parseOriginParams(searchParams) && hasProfileOrigin(profile)
+                ? `Sem um lugar na busca, usamos ${profileOrigin.label}.`
+                : ""
+            }
           />
 
           <div className="origin-bar">

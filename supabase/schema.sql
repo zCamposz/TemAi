@@ -1,4 +1,4 @@
--- Tem Aí? — Incrementos 1 a 3 (perfis + anúncios + geolocalização)
+-- Tem Aí? — Incrementos 1 a 3 e endereço do perfil (origem das recomendações)
 -- Execute no Supabase Dashboard → SQL Editor → New query → Run
 -- Pode rodar de novo com segurança (idempotente): recria o que faltar
 -- sem falhar se trigger/policy/tabela já existirem.
@@ -16,8 +16,25 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
-comment on table public.profiles is 'Perfil público de cada usuário cadastrado no Tem Aí?';
+comment on table public.profiles is 'Perfil de cada usuário. Nome e verificação são públicos; o endereço não.';
 comment on column public.profiles.verificado is 'Badge de identidade verificada (filtro em /explorar)';
+
+-- Endereço residencial: origem privada das recomendações. Não entra no pin do anúncio.
+alter table public.profiles add column if not exists cep text;
+alter table public.profiles add column if not exists logradouro text;
+alter table public.profiles add column if not exists numero text;
+alter table public.profiles add column if not exists bairro text;
+alter table public.profiles add column if not exists cidade text;
+alter table public.profiles add column if not exists lat double precision;
+alter table public.profiles add column if not exists lng double precision;
+
+comment on column public.profiles.cep is 'CEP da casa do usuário. Não é público e não entra no pin do anúncio.';
+comment on column public.profiles.logradouro is 'Logradouro da casa. Só o dono lê.';
+comment on column public.profiles.numero is 'Número da casa. Só o dono lê; a coordenada continua sendo a do CEP.';
+comment on column public.profiles.bairro is 'Bairro da casa, usado só como rótulo da origem para o próprio usuário.';
+comment on column public.profiles.cidade is 'Cidade da casa, usada só como rótulo da origem para o próprio usuário.';
+comment on column public.profiles.lat is 'Latitude do CEP do perfil. Não é pública.';
+comment on column public.profiles.lng is 'Longitude do CEP do perfil. Não é pública.';
 
 -- ---------------------------------------------------------------------------
 -- Row Level Security
@@ -39,9 +56,31 @@ create policy "Usuário atualiza o próprio perfil"
   on public.profiles for update
   using (auth.uid() = id);
 
+-- A policy pública precisa enxergar a linha (cards pedem nome e verificação).
+-- O endereço fica de fora do SELECT de anon/authenticated. service_role não é revogado.
+revoke select on table public.profiles from anon, authenticated;
+grant select (
+  id, nome, telefone, avatar_url, verificado, created_at, updated_at
+) on public.profiles to anon, authenticated;
+
+create or replace function public.get_own_profile()
+returns public.profiles
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p.*
+  from public.profiles p
+  where p.id = auth.uid();
+$$;
+
+revoke all on function public.get_own_profile() from public, anon;
+grant execute on function public.get_own_profile() to authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Trigger: criar perfil automaticamente no cadastro
--- Os campos nome e telefone vêm de raw_user_meta_data no signUp.
+-- Nome, telefone e endereço vêm de raw_user_meta_data no signUp.
 -- O trigger fica em auth.users — apagar public.profiles NÃO o remove.
 -- ---------------------------------------------------------------------------
 create or replace function public.handle_new_user()
@@ -49,12 +88,30 @@ returns trigger
 language plpgsql
 security definer set search_path = ''
 as $$
+declare
+  lat_text text := new.raw_user_meta_data ->> 'lat';
+  lng_text text := new.raw_user_meta_data ->> 'lng';
 begin
-  insert into public.profiles (id, nome, telefone)
+  insert into public.profiles (
+    id, nome, telefone, cep, logradouro, numero, bairro, cidade, lat, lng
+  )
   values (
     new.id,
     coalesce(new.raw_user_meta_data ->> 'nome', 'Usuário'),
-    new.raw_user_meta_data ->> 'telefone'
+    new.raw_user_meta_data ->> 'telefone',
+    new.raw_user_meta_data ->> 'cep',
+    new.raw_user_meta_data ->> 'logradouro',
+    new.raw_user_meta_data ->> 'numero',
+    new.raw_user_meta_data ->> 'bairro',
+    new.raw_user_meta_data ->> 'cidade',
+    case
+      when lat_text ~ '^-?[0-9]+(\.[0-9]+)?$' then lat_text::double precision
+      else null
+    end,
+    case
+      when lng_text ~ '^-?[0-9]+(\.[0-9]+)?$' then lng_text::double precision
+      else null
+    end
   );
   return new;
 end;
@@ -269,3 +326,5 @@ $$;
 
 grant execute on function public.search_products_near(double precision, double precision, double precision)
   to anon, authenticated;
+
+notify pgrst, 'reload schema';

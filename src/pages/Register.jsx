@@ -5,6 +5,7 @@ import { useAuth } from "../components/AuthProvider";
 import { GoogleMark } from "../components/Icon";
 import { useToast } from "../components/ToastProvider";
 import { getAuthErrorMessage } from "../lib/authErrors";
+import { geocodeCep, isUsableCoord } from "../lib/geo";
 
 const BENEFITS = [
   { icon: "checkCircle", text: "Cadastro gratuito, sem mensalidade" },
@@ -20,10 +21,44 @@ export default function Register() {
   const redirectTo = location.state?.from ?? "/";
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [cep, setCep] = useState("");
+  const [logradouro, setLogradouro] = useState("");
+  const [numero, setNumero] = useState("");
+  const [bairro, setBairro] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [coords, setCoords] = useState(null);
+  const [cepStatus, setCepStatus] = useState("");
 
   useEffect(() => {
     if (!loading && user) navigate(redirectTo, { replace: true });
   }, [loading, user, navigate, redirectTo]);
+
+  async function lookupCep(raw) {
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length !== 8) {
+      setCoords(null);
+      setCepStatus("");
+      return;
+    }
+
+    setCepStatus("Buscando CEP…");
+    try {
+      const found = await geocodeCep(digits);
+      if (!found || !isUsableCoord(found.lat, found.lng)) {
+        setCoords(null);
+        setCepStatus("Não foi possível localizar esse CEP.");
+        return;
+      }
+      setLogradouro(found.logradouro || "");
+      setBairro(found.bairro || "");
+      setCidade(found.cidade || "");
+      setCoords({ lat: found.lat, lng: found.lng });
+      setCepStatus("");
+    } catch {
+      setCoords(null);
+      setCepStatus("Não foi possível localizar esse CEP.");
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -40,15 +75,34 @@ export default function Register() {
     const telefone = form.telefone.value.trim();
     const senha = form.senha.value;
     const senha2 = form.senha2.value;
+    const endereco = {
+      cep: cep.replace(/\D/g, ""),
+      logradouro: logradouro.trim(),
+      numero: numero.trim(),
+      bairro: bairro.trim(),
+      cidade: cidade.trim(),
+      lat: coords?.lat,
+      lng: coords?.lng,
+    };
 
     if (senha !== senha2) {
       setError("As senhas não coincidem.");
       return;
     }
 
+    if (!endereco.cep || !endereco.logradouro || !endereco.numero || !endereco.bairro || !endereco.cidade) {
+      setError("Preencha CEP, logradouro, número, bairro e cidade.");
+      return;
+    }
+
+    if (!isUsableCoord(endereco.lat, endereco.lng)) {
+      setError("Não foi possível localizar esse CEP. Confira os números e tente de novo.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const data = await signUp({ nome, email, telefone, password: senha });
+      const data = await signUp({ nome, email, telefone, password: senha, endereco });
       if (data?.session) {
         showToast("Conta criada!", "Bem-vindo(a) ao Tem Aí?");
         navigate(redirectTo, { replace: true });
@@ -120,6 +174,82 @@ export default function Register() {
           />
           <span className="hint">Usado para combinar retiradas e devoluções com segurança.</span>
         </div>
+
+        <div className="form-row">
+          <div className="form-field">
+            <label htmlFor="cep">CEP</label>
+            <input
+              type="text"
+              id="cep"
+              name="cep"
+              inputMode="numeric"
+              autoComplete="postal-code"
+              placeholder="00000-000"
+              value={cep}
+              required
+              onChange={(event) => {
+                const next = event.target.value;
+                setCep(next);
+                lookupCep(next);
+              }}
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="numero">Número</label>
+            <input
+              type="text"
+              id="numero"
+              name="numero"
+              autoComplete="address-line2"
+              placeholder="123"
+              value={numero}
+              required
+              onChange={(event) => setNumero(event.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="form-field">
+          <label htmlFor="logradouro">Logradouro</label>
+          <input
+            type="text"
+            id="logradouro"
+            name="logradouro"
+            autoComplete="address-line1"
+            placeholder="Rua, avenida..."
+            value={logradouro}
+            required
+            onChange={(event) => setLogradouro(event.target.value)}
+          />
+          {cepStatus ? <span className="hint">{cepStatus}</span> : null}
+        </div>
+
+        <div className="form-row">
+          <div className="form-field">
+            <label htmlFor="bairro">Bairro</label>
+            <input
+              type="text"
+              id="bairro"
+              name="bairro"
+              value={bairro}
+              required
+              onChange={(event) => setBairro(event.target.value)}
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="cidade">Cidade</label>
+            <input
+              type="text"
+              id="cidade"
+              name="cidade"
+              autoComplete="address-level2"
+              value={cidade}
+              required
+              onChange={(event) => setCidade(event.target.value)}
+            />
+          </div>
+        </div>
+        <span className="hint">O CEP localiza as recomendações. O número da casa não aparece publicamente.</span>
 
         <div className="form-row">
           <div className="form-field">

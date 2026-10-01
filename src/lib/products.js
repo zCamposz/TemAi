@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "../components/AuthProvider";
 import { CATEGORIES, PRODUCTS } from "../data/catalog";
-import { DEFAULT_ORIGIN, withDistance } from "./geo";
+import { originFromProfile, withDistance } from "./geo";
 import { getInitials } from "./authErrors";
 import { isSupabaseConfigured, supabase } from "./supabase";
 
@@ -316,7 +317,9 @@ function isMissingGeoColumn(error) {
 }
 
 export function useMergedProducts() {
-  const [products, setProducts] = useState(() => withDistance(PRODUCTS, DEFAULT_ORIGIN));
+  const { profile } = useAuth();
+  const { lat, lng } = originFromProfile(profile);
+  const [catalog, setCatalog] = useState(PRODUCTS);
   const [loading, setLoading] = useState(isSupabaseConfigured);
 
   useEffect(() => {
@@ -330,9 +333,9 @@ export function useMergedProducts() {
     (async () => {
       try {
         const live = await fetchPublishedProducts();
-        if (mounted) setProducts(withDistance(mergeCatalog(live), DEFAULT_ORIGIN));
+        if (mounted) setCatalog(mergeCatalog(live));
       } catch {
-        if (mounted) setProducts(withDistance(PRODUCTS, DEFAULT_ORIGIN));
+        if (mounted) setCatalog(PRODUCTS);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -342,6 +345,11 @@ export function useMergedProducts() {
       mounted = false;
     };
   }, []);
+
+  const products = useMemo(
+    () => withDistance(catalog, { lat, lng }),
+    [catalog, lat, lng]
+  );
 
   return { products, loading };
 }
