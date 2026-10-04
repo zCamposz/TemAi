@@ -108,6 +108,36 @@ O que já funciona de verdade:
 - cálculo da reserva conforme as datas escolhidas (diárias, taxa de serviço e caução);
 - simulador de renda extra na tela de anúncio.
 
+## Requisitos
+
+| Requisito | Status |
+| --- | --- |
+| Sistema de autenticação com cadastro e login | Validado |
+| Cadastro de produtos com especificações detalhadas | Validado |
+| Pesquisa otimizada com filtragem por geolocalização | Validado |
+| Processo end-to-end de reserva e transação | Rascunho |
+| Integração com banco de dados | Validado |
+| APIs de geolocalização e mapas | Validado |
+| Interface responsiva | Validado |
+| Notificações (e-mail, no aplicativo ou SMS) | Rascunho |
+| Sistema de avaliações e reputação | Rascunho |
+| Painel administrativo | Rascunho |
+| Exibir um mapa com a origem da busca e os anúncios do raio, abrindo o produto ao clicar no pin | Validado |
+| Exibir a página do produto e simular o valor por período (diárias, taxa de serviço de 10% e caução) | Validado |
+| Permitir que o locatário autenticado solicite a reserva de um item para um período, sem datas conflitantes | Rascunho |
+| Permitir que o locador confirme ou recuse solicitações de reserva | Rascunho |
+| Autenticar os usuários com senha de no mínimo 8 caracteres | Validado |
+| Garantir que cada usuário altere apenas o próprio perfil, anúncios e fotos | Validado |
+| Não exibir publicamente o endereço exato do locador, somente bairro e distância aproximada | Validado |
+| Interface responsiva e utilizável em celulares, tablets e computadores | Validado |
+| Apresentar os resultados da busca por proximidade em até 3 segundos em condições normais de uso | Rascunho |
+| Continuar permitindo anunciar e buscar caso um serviço externo de CEP ou geocodificação esteja indisponível | Validado |
+| Código modular e verificação de lint sem erros | Validado |
+| Credenciais do banco de dados fora do repositório | Validado |
+| Informar o endereço residencial (CEP, logradouro, número, bairro e cidade) no cadastro e no perfil, usando-o como origem padrão das buscas | Validado |
+| Exibir os ecopontos de São Paulo com endereço, horário e materiais aceitos, com busca textual, mapa e ordenação por proximidade | Validado |
+| Permitir que apenas o dono leia logradouro, número, CEP e coordenadas do próprio perfil | Validado |
+
 ## Publicar no GitHub Pages
 
 ```bash
