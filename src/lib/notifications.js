@@ -14,7 +14,7 @@ export function useNotifications(userId) {
     if (!isSupabaseConfigured || !userId) return setItems([]);
     const { data } = await supabase
       .from("notifications")
-      .select("id, title, message, read, created_at")
+      .select("id, title, message, read, created_at, link")
       .order("created_at", { ascending: false })
       .limit(100);
     setItems(
@@ -23,6 +23,7 @@ export function useNotifications(userId) {
         title: n.title,
         message: n.message,
         read: n.read,
+        link: n.link,
         createdAt: n.created_at,
       }))
     );

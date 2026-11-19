@@ -77,7 +77,7 @@ export default function NotificationBell() {
               {items.map((n) => (
                 <li key={n.id} className={n.read ? "" : "unread"}>
                   <Link
-                    to="/reservas"
+                    to={n.link || "/reservas"}
                     onClick={() => {
                       markRead(n.id).then(reload);
                       setOpen(false);

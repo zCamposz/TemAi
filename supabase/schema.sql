@@ -1168,3 +1168,37 @@ exception when duplicate_object then null;
 end $$;
 
 notify pgrst, 'reload schema';
+
+
+-- ===========================================================================
+-- Notificação de nova mensagem no sino
+-- ===========================================================================
+
+alter table public.notifications add column if not exists link text;
+
+create or replace function public.messages_notify_recipient()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  conv public.conversations;
+  sender_name text;
+begin
+  select * into conv from public.conversations where id = new.conversation_id;
+  select nome into sender_name from public.profiles where id = new.sender_id;
+  insert into public.notifications (user_id, title, message, link) values (
+    case when new.sender_id = conv.owner_id then conv.renter_id else conv.owner_id end,
+    'Nova mensagem de ' || coalesce(sender_name, 'um usuário'),
+    left(new.body, 120),
+    '/mensagens?c=' || conv.id
+  );
+  return new;
+end;
+$$;
+
+drop trigger if exists messages_notify_recipient on public.messages;
+create trigger messages_notify_recipient
+  after insert on public.messages
+  for each row execute function public.messages_notify_recipient();

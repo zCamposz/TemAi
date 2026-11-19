@@ -4697,3 +4697,28 @@ h3 > .admin-badge { margin: 0 0 0 8px; vertical-align: middle; }
   .admin-tabs { display: flex; }
   .admin-tab { flex: 1; justify-content: center; }
 }
+
+/* Página de mensagens */
+.messages-page { padding-bottom: 56px; }
+.messages-layout { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 20px; align-items: start; }
+.conv-list { list-style: none; margin: 0; padding: 8px; display: flex; flex-direction: column; gap: 4px; background: #fff; border: 1px solid var(--line); border-radius: 16px; max-height: 560px; overflow-y: auto; }
+.conv-item { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 0; border-radius: 12px; background: transparent; text-align: left; cursor: pointer; font: inherit; }
+.conv-item:hover { background: var(--bg); }
+.conv-item.active { background: var(--bg); box-shadow: inset 3px 0 0 var(--brand); }
+.conv-text { display: flex; flex-direction: column; min-width: 0; }
+.conv-text strong { font-size: 15px; }
+.conv-text small { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-thread { max-width: none; height: 560px; border: 1px solid var(--line); box-shadow: none; }
+.chat-thread .chat-body { min-height: 0; }
+.chat-empty { display: flex; align-items: center; justify-content: center; height: 560px; background: #fff; border: 1px dashed var(--line); border-radius: 16px; color: var(--muted); text-align: center; padding: 24px; }
+@media (max-width: 760px) {
+  .messages-layout { grid-template-columns: 1fr; }
+  .conv-list { max-height: 220px; }
+  .chat-thread, .chat-empty { height: 480px; }
+}
+
+.messages-layout.single { grid-template-columns: 1fr; max-width: 520px; }
+.chat-back { background: none; border: 0; font-size: 24px; line-height: 1; cursor: pointer; color: var(--ink, inherit); padding: 4px 8px; border-radius: 8px; }
+.chat-back:hover { background: var(--bg); }
+
+.quality-grid .step-card::before { display: none; }

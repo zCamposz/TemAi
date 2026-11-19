@@ -42,7 +42,7 @@ export default function Messages() {
         </div>
       </section>
 
-      <div className="container" style={{ paddingBottom: 48 }}>
+      <div className="container messages-page">
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -55,43 +55,39 @@ export default function Messages() {
             Nenhuma conversa ainda. Abra um anúncio e toque em “Chat” para falar com o locador.
           </p>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(220px, 300px) 1fr",
-              gap: 20,
-              alignItems: "start",
-            }}
-          >
-            <ul className="listing-list">
+          <div className={`messages-layout${active ? "" : " single"}`}>
+            <ul className="conv-list">
               {conversations.map((c) => (
                 <li key={c.id}>
                   <button
                     type="button"
-                    className="listing-row"
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      gridTemplateColumns: "1fr",
-                      background: c.id === activeId ? "var(--surface-2, #f3f6f4)" : "transparent",
-                      cursor: "pointer",
-                    }}
+                    className={`conv-item${c.id === activeId ? " active" : ""}`}
                     onClick={() => setParams({ c: c.id })}
                   >
-                    <div>
-                      <h3>{c.other?.nome ?? "Usuário"}</h3>
-                      <p>{c.product_title}</p>
-                    </div>
+                    <span className="avatar av-1">
+                      {c.other?.avatar_url ? (
+                        <img src={c.other.avatar_url} alt="" />
+                      ) : (
+                        getInitials(c.other?.nome ?? "U")
+                      )}
+                    </span>
+                    <span className="conv-text">
+                      <strong>{c.other?.nome ?? "Usuário"}</strong>
+                      <small>{c.product_title}</small>
+                    </span>
                   </button>
                 </li>
               ))}
             </ul>
 
             {active ? (
-              <Thread key={active.id} conversation={active} userId={user.id} />
-            ) : (
-              <p style={{ color: "var(--muted)" }}>Selecione uma conversa.</p>
-            )}
+              <Thread
+                key={active.id}
+                conversation={active}
+                userId={user.id}
+                onBack={() => setParams({})}
+              />
+            ) : null}
           </div>
         )}
       </div>
@@ -99,15 +95,16 @@ export default function Messages() {
   );
 }
 
-function Thread({ conversation, userId }) {
+function Thread({ conversation, userId, onBack }) {
   const { messages, loading, append } = useMessages(conversation.id, userId);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const endRef = useRef(null);
+  const bodyRef = useRef(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = bodyRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   async function handleSend(e) {
@@ -128,8 +125,11 @@ function Thread({ conversation, userId }) {
   }
 
   return (
-    <div className="chat-box" style={{ position: "static", width: "100%", maxWidth: "none" }}>
+    <div className="chat-box chat-thread">
       <div className="chat-head">
+        <button type="button" className="chat-back" onClick={onBack} aria-label="Voltar às conversas">
+          ←
+        </button>
         <span className="avatar av-1">
           {conversation.other?.avatar_url ? (
             <img src={conversation.other.avatar_url} alt="" />
@@ -144,14 +144,14 @@ function Thread({ conversation, userId }) {
           </small>
         </div>
       </div>
-      <div className="chat-body" style={{ minHeight: 280, maxHeight: 460, overflowY: "auto" }}>
+      <div className="chat-body" ref={bodyRef}>
         {loading && <p style={{ color: "var(--muted)" }}>Carregando…</p>}
         {messages.map((m) => (
           <div key={m.id} className={`chat-msg ${m.sender_id === userId ? "me" : "owner"}`}>
             {m.body}
           </div>
         ))}
-        <div ref={endRef} />
+        
       </div>
       {error && (
         <p className="form-error" role="alert">
