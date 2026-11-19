@@ -7,7 +7,7 @@ import { useToast } from "../components/ToastProvider";
 import { formatPrice } from "../data/catalog";
 import { getAuthErrorMessage, getInitials } from "../lib/authErrors";
 import { geocodeCep, hasProfileOrigin, isUsableCoord } from "../lib/geo";
-import { fetchMyProducts } from "../lib/products";
+import { deleteProduct, fetchMyProducts } from "../lib/products";
 
 export default function Profile() {
   const { user, profile, signOut, updateProfile } = useAuth();
@@ -26,6 +26,7 @@ export default function Profile() {
   const [error, setError] = useState("");
   const [listings, setListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(true);
+  const [listingsError, setListingsError] = useState("");
 
   const displayName = profile?.nome ?? user?.user_metadata?.nome ?? "Usuário";
 
@@ -49,8 +50,12 @@ export default function Profile() {
       try {
         const mine = await fetchMyProducts(user.id);
         if (mounted) setListings(mine);
-      } catch {
-        if (mounted) setListings([]);
+      } catch (err) {
+        console.error("Erro ao carregar anúncios:", err);
+        if (mounted) {
+          setListings([]);
+          setListingsError(err?.message || "Não foi possível carregar seus anúncios.");
+        }
       } finally {
         if (mounted) setListingsLoading(false);
       }
@@ -139,6 +144,20 @@ export default function Profile() {
       setError(getAuthErrorMessage(err));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeleteListing(item) {
+    if (!user || item.ownerId !== user.id) return;
+    if (!window.confirm(`Excluir o anúncio "${item.title}"? Essa ação não pode ser desfeita.`)) {
+      return;
+    }
+    try {
+      await deleteProduct({ id: item.id, userId: user.id });
+      setListings((current) => current.filter((listing) => listing.id !== item.id));
+      showToast("Anúncio excluído", "O anúncio foi removido do site.");
+    } catch (err) {
+      showToast("Erro ao excluir", err.message || "Tente novamente.");
     }
   }
 
@@ -314,6 +333,10 @@ export default function Profile() {
           <h2>Meus anúncios</h2>
           {listingsLoading ? (
             <p style={{ color: "var(--muted)" }}>Carregando anúncios…</p>
+          ) : listingsError ? (
+            <p className="form-error" role="alert">
+              Erro ao carregar anúncios: {listingsError}
+            </p>
           ) : listings.length === 0 ? (
             <p style={{ color: "var(--muted)" }}>
               Você ainda não anunciou nenhum item.{" "}
@@ -322,7 +345,7 @@ export default function Profile() {
           ) : (
             <ul className="listing-list">
               {listings.map((item) => (
-                <li key={item.id}>
+                <li key={item.id} style={{ display: "grid", gap: 8 }}>
                   <Link className="listing-row" to={`/produto/${item.slug}`}>
                     {item.photos?.[0] ? (
                       <img src={item.photos[0]} alt="" />
@@ -340,6 +363,14 @@ export default function Profile() {
                     </div>
                     <span className="btn btn-outline btn-sm">Ver</span>
                   </Link>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    style={{ justifySelf: "end" }}
+                    onClick={() => handleDeleteListing(item)}
+                  >
+                    Excluir anúncio
+                  </button>
                 </li>
               ))}
             </ul>

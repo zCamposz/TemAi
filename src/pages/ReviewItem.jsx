@@ -12,7 +12,7 @@ import { isSupabaseConfigured } from "../lib/supabase";
 export default function ReviewItem() {
   const { id } = useParams();
   const { user, profile } = useAuth();
-  const bookings = useBookings();
+  const { bookings, loading: loadingBookings } = useBookings(user.id);
   const navigate = useNavigate();
   const showToast = useToast();
   const booking = bookings.find((b) => b.id === id && b.renterId === user.id);
@@ -42,6 +42,7 @@ export default function ReviewItem() {
   }, [user.id, id]);
 
   // Só quem alugou e já devolveu o item pode avaliar.
+  if (loadingBookings) return null;
   if (!booking || booking.status !== "concluida") return <Navigate to="/reservas" replace />;
 
   async function handleSubmit(e) {

@@ -306,6 +306,40 @@ export async function saveProduct({
   return mapRowToProduct(data);
 }
 
+function photoPathFromUrl(url) {
+  const marker = `/${PHOTO_BUCKET}/`;
+  const index = url.indexOf(marker);
+  return index === -1 ? null : decodeURIComponent(url.slice(index + marker.length).split("?")[0]);
+}
+
+/** Exclui o anúncio (e as fotos) do banco. Só o dono consegue (RLS + filtro owner_id). */
+export async function deleteProduct({ id, userId }) {
+  if (!isSupabaseConfigured || !id || !userId) {
+    throw new Error("Você precisa estar logado para excluir o anúncio.");
+  }
+
+  const { data, error } = await supabase
+    .from("products")
+    .delete()
+    .eq("id", id)
+    .eq("owner_id", userId)
+    .select("id, fotos");
+
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error("Não foi possível excluir: o anúncio não é seu ou já foi removido.");
+  }
+
+  const paths = (data[0].fotos ?? [])
+    .map(photoPathFromUrl)
+    .filter((path) => path && path.startsWith(`${userId}/`));
+  if (paths.length > 0) {
+    await supabase.storage.from(PHOTO_BUCKET).remove(paths).catch(() => {});
+  }
+
+  invalidateProductCache();
+}
+
 function withoutGeo(row) {
   const next = { ...row };
   delete next.lat;

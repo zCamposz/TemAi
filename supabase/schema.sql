@@ -748,4 +748,423 @@ $$;
 revoke all on function public.admin_set_admin(uuid, boolean) from public, anon;
 grant execute on function public.admin_set_admin(uuid, boolean) to authenticated;
 
+-- ===========================================================================
+-- Chat real entre locatário e locador (um chat por anúncio + locatário)
+-- ===========================================================================
+
+create table if not exists public.conversations (
+  id uuid primary key default gen_random_uuid(),
+  product_slug text not null,
+  product_title text not null,
+  owner_id uuid not null references public.profiles(id) on delete cascade,
+  renter_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  last_message_at timestamptz not null default now(),
+  unique (product_slug, renter_id),
+  check (owner_id <> renter_id)
+);
+
+create index if not exists conversations_owner_idx on public.conversations (owner_id);
+create index if not exists conversations_renter_idx on public.conversations (renter_id);
+
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  sender_id uuid not null references public.profiles(id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 2000),
+  created_at timestamptz not null default now(),
+  read_at timestamptz
+);
+
+create index if not exists messages_conversation_idx on public.messages (conversation_id, created_at);
+
+alter table public.conversations enable row level security;
+alter table public.messages enable row level security;
+
+drop policy if exists "Participantes veem a conversa" on public.conversations;
+create policy "Participantes veem a conversa"
+  on public.conversations for select
+  using (auth.uid() = owner_id or auth.uid() = renter_id);
+
+drop policy if exists "Locatário inicia conversa" on public.conversations;
+create policy "Locatário inicia conversa"
+  on public.conversations for insert
+  with check (auth.uid() = renter_id and owner_id <> renter_id);
+
+drop policy if exists "Participantes veem mensagens" on public.messages;
+create policy "Participantes veem mensagens"
+  on public.messages for select
+  using (exists (
+    select 1 from public.conversations c
+    where c.id = conversation_id and (c.owner_id = auth.uid() or c.renter_id = auth.uid())
+  ));
+
+drop policy if exists "Participantes enviam mensagens" on public.messages;
+create policy "Participantes enviam mensagens"
+  on public.messages for insert
+  with check (
+    sender_id = auth.uid()
+    and exists (
+      select 1 from public.conversations c
+      where c.id = conversation_id and (c.owner_id = auth.uid() or c.renter_id = auth.uid())
+    )
+  );
+
+-- Só quem recebeu pode marcar como lida
+drop policy if exists "Destinatário marca como lida" on public.messages;
+create policy "Destinatário marca como lida"
+  on public.messages for update
+  using (
+    sender_id <> auth.uid()
+    and exists (
+      select 1 from public.conversations c
+      where c.id = conversation_id and (c.owner_id = auth.uid() or c.renter_id = auth.uid())
+    )
+  );
+
+grant select, insert on table public.conversations to authenticated;
+grant select, insert, update on table public.messages to authenticated;
+
+create or replace function public.messages_touch_conversation()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.conversations set last_message_at = new.created_at where id = new.conversation_id;
+  return new;
+end;
+$$;
+
+drop trigger if exists messages_touch_conversation on public.messages;
+create trigger messages_touch_conversation
+  after insert on public.messages
+  for each row execute function public.messages_touch_conversation();
+
+-- Tempo real
+do $$
+begin
+  alter publication supabase_realtime add table public.messages;
+exception when duplicate_object then null;
+end $$;
+
+-- ===========================================================================
+-- Reservas e notificações no banco (antes ficavam no localStorage de cada
+-- navegador, então locador e locatário nunca viam a mesma reserva).
+-- Toda mudança de status passa por funções security definer que validam
+-- quem pode fazer o quê; o cliente não escreve direto nas tabelas.
+-- ===========================================================================
+
+create table if not exists public.bookings (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null,
+  title text not null,
+  icon text,
+  hue text,
+  photo text,
+  owner_id uuid references public.profiles(id) on delete set null,
+  owner_name text not null,
+  renter_id uuid not null references public.profiles(id) on delete cascade,
+  renter_name text not null,
+  start_date date not null,
+  end_date date not null,
+  days integer not null check (days >= 1),
+  subtotal numeric(10, 2) not null,
+  fee numeric(10, 2) not null,
+  deposit numeric(10, 2) not null default 0,
+  total numeric(10, 2) not null,
+  status text not null default 'confirmada'
+    check (status in ('pendente', 'confirmada', 'paga', 'em_andamento', 'concluida', 'recusada', 'cancelada')),
+  payment text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (end_date > start_date)
+);
+
+comment on table public.bookings is 'Reservas entre locatário e locador. owner_id é nulo nos itens de demonstração.';
+
+create index if not exists bookings_renter_idx on public.bookings (renter_id, created_at desc);
+create index if not exists bookings_owner_idx on public.bookings (owner_id, created_at desc);
+create index if not exists bookings_slug_idx on public.bookings (slug, start_date);
+
+alter table public.bookings enable row level security;
+
+drop policy if exists "Partes leem a reserva" on public.bookings;
+create policy "Partes leem a reserva"
+  on public.bookings for select
+  to authenticated
+  using (auth.uid() = renter_id or auth.uid() = owner_id);
+
+revoke all on table public.bookings from anon, authenticated;
+grant select on table public.bookings to authenticated;
+
+drop trigger if exists bookings_updated_at on public.bookings;
+create trigger bookings_updated_at
+  before update on public.bookings
+  for each row execute function public.set_updated_at();
+
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  title text not null,
+  message text not null,
+  read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists notifications_user_idx on public.notifications (user_id, created_at desc);
+
+alter table public.notifications enable row level security;
+
+drop policy if exists "Usuário lê as próprias notificações" on public.notifications;
+create policy "Usuário lê as próprias notificações"
+  on public.notifications for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "Usuário atualiza as próprias notificações" on public.notifications;
+create policy "Usuário atualiza as próprias notificações"
+  on public.notifications for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Usuário apaga as próprias notificações" on public.notifications;
+create policy "Usuário apaga as próprias notificações"
+  on public.notifications for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+revoke all on table public.notifications from anon, authenticated;
+grant select, delete on table public.notifications to authenticated;
+grant update (read) on table public.notifications to authenticated;
+
+-- Datas ocupadas de um item (qualquer visitante pode consultar; sem dados pessoais).
+create or replace function public.booking_blocked_ranges(p_slug text)
+returns table (start_date date, end_date date)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select b.start_date, b.end_date
+  from public.bookings b
+  where b.slug = p_slug
+    and b.status in ('pendente', 'confirmada', 'paga', 'em_andamento')
+    and b.end_date >= current_date;
+$$;
+
+revoke all on function public.booking_blocked_ranges(text) from public;
+grant execute on function public.booking_blocked_ranges(text) to anon, authenticated;
+
+create or replace function public.create_booking(
+  p_slug text,
+  p_start date,
+  p_end date,
+  p_renter_name text,
+  p_title text,
+  p_icon text,
+  p_hue text,
+  p_photo text,
+  p_owner_name text,
+  p_price numeric,
+  p_deposit numeric
+)
+returns public.bookings
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  prod record;
+  v_owner uuid;
+  v_title text := p_title;
+  v_owner_name text := p_owner_name;
+  v_price numeric := p_price;
+  v_deposit numeric := coalesce(p_deposit, 0);
+  v_days integer;
+  v_subtotal numeric;
+  v_fee numeric;
+  result public.bookings;
+begin
+  if uid is null then
+    raise exception 'Entre na sua conta para reservar.';
+  end if;
+  if p_start is null or p_end is null or p_end <= p_start then
+    raise exception 'Período inválido.';
+  end if;
+
+  -- Anúncio real: preço, caução e dono vêm do banco, não do navegador.
+  select p.owner_id, p.titulo, p.preco_dia, p.caucao, pr.nome as owner_nome
+    into prod
+  from public.products p
+  join public.profiles pr on pr.id = p.owner_id
+  where p.slug = p_slug and p.status = 'publicado';
+
+  if found then
+    v_owner := prod.owner_id;
+    v_title := prod.titulo;
+    v_price := prod.preco_dia;
+    v_deposit := prod.caucao;
+    v_owner_name := prod.owner_nome;
+    if v_owner = uid then
+      raise exception 'Você não pode reservar o seu próprio anúncio.';
+    end if;
+  end if;
+
+  if v_price is null or v_price <= 0 then
+    raise exception 'Preço inválido.';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext(p_slug));
+
+  if exists (
+    select 1 from public.bookings b
+    where b.slug = p_slug
+      and b.status in ('pendente', 'confirmada', 'paga', 'em_andamento')
+      and p_start < b.end_date and p_end > b.start_date
+  ) then
+    raise exception 'Este item já está reservado nesse período.';
+  end if;
+
+  v_days := p_end - p_start;
+  v_subtotal := v_price * v_days;
+  v_fee := round(v_subtotal * 0.10);
+
+  insert into public.bookings (
+    slug, title, icon, hue, photo, owner_id, owner_name, renter_id, renter_name,
+    start_date, end_date, days, subtotal, fee, deposit, total, status
+  ) values (
+    p_slug, v_title, p_icon, p_hue, p_photo, v_owner, coalesce(v_owner_name, 'Locador'),
+    uid, coalesce(nullif(btrim(p_renter_name), ''), 'Locatário'),
+    p_start, p_end, v_days, v_subtotal, v_fee, v_deposit, v_subtotal + v_fee + v_deposit,
+    'confirmada'
+  ) returning * into result;
+
+  if v_owner is not null then
+    insert into public.notifications (user_id, title, message) values (
+      v_owner, 'Nova reserva',
+      result.renter_name || ' reservou "' || result.title || '" de ' ||
+        to_char(p_start, 'DD/MM/YYYY') || ' a ' || to_char(p_end, 'DD/MM/YYYY') ||
+        '. Aguardando o pagamento.'
+    );
+  end if;
+  insert into public.notifications (user_id, title, message) values (
+    uid, 'Reserva criada',
+    'Faça o pagamento de "' || result.title || '" para garantir o item.'
+  );
+
+  return result;
+end;
+$$;
+
+-- Muda o status de uma reserva se o usuário tiver o papel certo e o status atual permitir.
+create or replace function public.booking_transition(
+  p_id uuid,
+  p_action text,
+  p_payment text default null
+)
+returns public.bookings
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  b public.bookings;
+  is_renter boolean;
+  is_owner boolean;
+begin
+  if uid is null then
+    raise exception 'Entre na sua conta.';
+  end if;
+
+  select * into b from public.bookings where id = p_id for update;
+  if not found then
+    raise exception 'Reserva não encontrada.';
+  end if;
+
+  is_renter := b.renter_id = uid;
+  -- Item de demonstração não tem locador real: o locatário assume o papel dele.
+  is_owner := b.owner_id = uid or (b.owner_id is null and is_renter);
+
+  if p_action = 'pay' then
+    if not is_renter or b.status <> 'confirmada' then
+      raise exception 'Esta reserva não pode ser paga.';
+    end if;
+    update public.bookings set status = 'paga', payment = p_payment where id = p_id returning * into b;
+    if b.owner_id is not null then
+      insert into public.notifications (user_id, title, message) values (
+        b.owner_id, 'Pagamento recebido',
+        b.renter_name || ' pagou a reserva de "' || b.title || '". Combine a retirada e confirme em Reservas.'
+      );
+    end if;
+
+  elsif p_action = 'cancel' then
+    if not is_renter or b.status not in ('pendente', 'confirmada') then
+      raise exception 'Esta reserva não pode ser cancelada.';
+    end if;
+    update public.bookings set status = 'cancelada' where id = p_id returning * into b;
+    if b.owner_id is not null then
+      insert into public.notifications (user_id, title, message) values (
+        b.owner_id, 'Reserva cancelada',
+        b.renter_name || ' cancelou a reserva de "' || b.title || '".'
+      );
+    end if;
+
+  elsif p_action = 'pickup' then
+    if not is_owner or b.status <> 'paga' then
+      raise exception 'Só o locador pode confirmar a retirada de uma reserva paga.';
+    end if;
+    update public.bookings set status = 'em_andamento' where id = p_id returning * into b;
+    insert into public.notifications (user_id, title, message) values (
+      b.renter_id, 'Retirada confirmada',
+      '"' || b.title || '" está com você até ' || to_char(b.end_date, 'DD/MM/YYYY') ||
+        '. Ao devolver, clique em "Item devolvido".'
+    );
+
+  elsif p_action = 'return' then
+    if not is_renter or b.status <> 'em_andamento' then
+      raise exception 'Esta reserva não está em andamento.';
+    end if;
+    update public.bookings set status = 'concluida' where id = p_id returning * into b;
+    insert into public.notifications (user_id, title, message) values (
+      b.renter_id, 'Reserva concluída',
+      'A devolução de "' || b.title || '" foi registrada. Avalie o item em Reservas.'
+    );
+    if b.owner_id is not null then
+      insert into public.notifications (user_id, title, message) values (
+        b.owner_id, 'Item devolvido',
+        b.renter_name || ' devolveu "' || b.title || '". Reserva concluída.'
+      );
+    end if;
+
+  else
+    raise exception 'Ação inválida.';
+  end if;
+
+  return b;
+end;
+$$;
+
+revoke all on function public.create_booking(text, date, date, text, text, text, text, text, text, numeric, numeric) from public, anon;
+grant execute on function public.create_booking(text, date, date, text, text, text, text, text, text, numeric, numeric) to authenticated;
+revoke all on function public.booking_transition(uuid, text, text) from public, anon;
+grant execute on function public.booking_transition(uuid, text, text) to authenticated;
+
+-- Tempo real: o locador vê o pagamento e o locatário vê a retirada na hora.
+do $$
+begin
+  alter publication supabase_realtime add table public.bookings;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.notifications;
+exception when duplicate_object then null;
+end $$;
+
 notify pgrst, 'reload schema';

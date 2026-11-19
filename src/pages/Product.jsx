@@ -8,8 +8,9 @@ import { summarize, useProductReviews } from "../lib/avaliacoesProduto";
 import { useAuth } from "../components/AuthProvider";
 import { useToast } from "../components/ToastProvider";
 import { formatDistance, formatPrice, formatRating, getProduct } from "../data/catalog";
-import { calcTotals, createBooking, findConflict, useBookings } from "../lib/bookings";
-import { fetchProductBySlug, useMergedProducts } from "../lib/products";
+import { calcTotals, createBooking, findConflict, useBlockedRanges } from "../lib/bookings";
+import { getOrCreateConversation } from "../lib/chat";
+import { deleteProduct, fetchProductBySlug, useMergedProducts } from "../lib/products";
 
 const THUMB_ICONS = ["box", "zap", "camera"];
 
@@ -37,7 +38,7 @@ export default function Product() {
   const catalogProduct = getProduct(slug);
   const { products } = useMergedProducts();
   const { user, profile } = useAuth();
-  const bookings = useBookings();
+  const blockedRanges = useBlockedRanges(slug);
   const navigate = useNavigate();
   const location = useLocation();
   const showToast = useToast();
@@ -93,12 +94,49 @@ export default function Product() {
 
   const { rating, count: reviewCount } = summarize(productReviews);
   const { subtotal, fee, total } = calcTotals(product.price, product.deposit, days);
-  const conflict = findConflict(bookings, product.slug, start, end);
+  const conflict = findConflict(blockedRanges, start, end);
   const invalidRange = !start || !end || end <= start;
   const city = product.city ?? "São Paulo";
   const photos = product.photos?.filter(Boolean) ?? [];
   const hasPhotos = photos.length > 0;
   const thumbs = hasPhotos ? photos : [product.icon, ...THUMB_ICONS];
+
+  const isOwner = Boolean(user) && product.source === "supabase" && product.ownerId === user.id;
+
+  const handleChat = async () => {
+    if (product.source !== "supabase") {
+      setChatOpen(true); // anúncio de demonstração: chat simulado
+      return;
+    }
+    if (!user) {
+      navigate("/login", { state: { from: location.pathname } });
+      return;
+    }
+    if (isOwner) {
+      navigate("/mensagens");
+      return;
+    }
+    try {
+      const id = await getOrCreateConversation({ product, userId: user.id });
+      navigate(`/mensagens?c=${id}`);
+    } catch (err) {
+      showToast("Erro ao abrir o chat", err.message || "Tente novamente.");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!isOwner) return;
+    if (!window.confirm(`Excluir o anúncio "${product.title}"? Essa ação não pode ser desfeita.`)) {
+      return;
+    }
+    try {
+      await deleteProduct({ id: product.id, userId: user.id });
+      showToast("Anúncio excluído", "O anúncio foi removido do site.");
+      navigate("/perfil");
+    } catch (err) {
+      showToast("Erro ao excluir", err.message || "Tente novamente.");
+    }
+  };
 
   const handleStartChange = (value) => {
     setStart(value);
@@ -130,6 +168,11 @@ export default function Product() {
 
         <div className="product-title-row">
           <h1>{product.title}</h1>
+          {isOwner && (
+            <button type="button" className="btn btn-outline btn-sm" onClick={handleDelete}>
+              Excluir anúncio
+            </button>
+          )}
           <div className="product-meta">
             <span className="rating-inline">
               <Icon name="star" size="sm" />
@@ -312,22 +355,24 @@ export default function Product() {
                 type="button"
                 className="btn btn-primary btn-lg btn-block"
                 disabled={Boolean(user) && (invalidRange || Boolean(conflict))}
-                onClick={() => {
+                onClick={async () => {
                   if (!user) {
                     navigate("/login", { state: { from: location.pathname } });
                     return;
                   }
                   if (invalidRange || conflict) return;
-                  const booking = createBooking({
-                    product,
-                    user,
-                    renterName: profile?.nome ?? user.user_metadata?.nome ?? "Locatário",
-                    start,
-                    end,
-                    days,
-                  });
-                  showToast("Reserva criada", "Finalize o pagamento para garantir o item.");
-                  navigate(`/checkout/${booking.id}`);
+                  try {
+                    const booking = await createBooking({
+                      product,
+                      renterName: profile?.nome ?? user.user_metadata?.nome ?? "Locatário",
+                      start,
+                      end,
+                    });
+                    showToast("Reserva criada", "Finalize o pagamento para garantir o item.");
+                    navigate(`/checkout/${booking.id}`);
+                  } catch (err) {
+                    showToast("Não foi possível reservar", err?.message || "Tente novamente.");
+                  }
                 }}
               >
                 {user ? "Reservar e pagar" : "Entrar para reservar"}
@@ -364,7 +409,7 @@ export default function Product() {
                 <button
                   type="button"
                   className="btn btn-outline btn-sm"
-                  onClick={() => setChatOpen(true)}
+                  onClick={handleChat}
                 >
                   Chat
                 </button>

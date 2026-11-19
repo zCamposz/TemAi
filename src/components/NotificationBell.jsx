@@ -20,7 +20,7 @@ function timeAgo(iso) {
 
 export default function NotificationBell() {
   const { user } = useAuth();
-  const items = useNotifications(user?.id);
+  const { items, reload } = useNotifications(user?.id);
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const unread = items.filter((n) => !n.read).length;
@@ -49,7 +49,7 @@ export default function NotificationBell() {
         aria-label={unread ? `Notificações (${unread} não lidas)` : "Notificações"}
         aria-expanded={open}
         onClick={() => {
-          if (!open && unread) markAllRead(user.id);
+          if (!open && unread) markAllRead(user.id).then(reload);
           setOpen((v) => !v);
         }}
       >
@@ -62,10 +62,10 @@ export default function NotificationBell() {
           <div className="notif-head">
             <strong>Notificações</strong>
             <div>
-              <button type="button" onClick={() => markAllRead(user.id)} disabled={!unread}>
+              <button type="button" onClick={() => markAllRead(user.id).then(reload)} disabled={!unread}>
                 Marcar como lidas
               </button>
-              <button type="button" onClick={() => clearNotifications(user.id)} disabled={!items.length}>
+              <button type="button" onClick={() => clearNotifications(user.id).then(reload)} disabled={!items.length}>
                 Limpar
               </button>
             </div>
@@ -79,7 +79,7 @@ export default function NotificationBell() {
                   <Link
                     to="/reservas"
                     onClick={() => {
-                      markRead(n.id);
+                      markRead(n.id).then(reload);
                       setOpen(false);
                     }}
                   >

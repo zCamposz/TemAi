@@ -8,7 +8,6 @@ import { useToast } from "../components/ToastProvider";
 import { formatPrice } from "../data/catalog";
 import {
   STATUS_LABEL,
-  clearBookings,
   confirmPickup,
   useBookings,
 } from "../lib/bookings";
@@ -77,16 +76,20 @@ function BookingRow({ booking, role, actions }) {
 export default function Bookings() {
   const { user } = useAuth();
   const showToast = useToast();
-  const all = useBookings();
+  const { bookings: all, loading } = useBookings(user.id);
   const [tab, setTab] = useState("minhas");
 
   const mine = all.filter((b) => b.renterId === user.id);
   const received = all.filter((b) => b.ownerId === user.id);
 
   function act(fn, title, message) {
-    return () => {
-      fn();
-      showToast(title, message);
+    return async () => {
+      try {
+        await fn();
+        showToast(title, message);
+      } catch (err) {
+        showToast("Não foi possível concluir", err?.message || "Tente novamente.");
+      }
     };
   }
 
@@ -103,7 +106,7 @@ export default function Bookings() {
           act(
             () => confirmPickup(b.id),
             "Retirada confirmada",
-            "O valor foi repassado a você. A caução fica retida até a devolução."
+            "O item está em andamento. O locatário foi avisado."
           ),
           "btn-primary"
         ),
@@ -147,7 +150,9 @@ export default function Bookings() {
             </button>
           </div>
 
-          {list.length === 0 ? (
+          {loading ? (
+            <p style={{ color: "var(--muted)" }}>Carregando reservas…</p>
+          ) : list.length === 0 ? (
             <p style={{ color: "var(--muted)" }}>
               {tab === "minhas" ? (
                 "Você ainda não fez nenhuma reserva."
@@ -168,16 +173,6 @@ export default function Bookings() {
             </ul>
           )}
 
-          {all.length > 0 && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              style={{ marginTop: 16 }}
-              onClick={act(clearBookings, "Demonstração reiniciada", "Todas as reservas foram apagadas.")}
-            >
-              Limpar reservas
-            </button>
-          )}
         </section>
 
       </div>

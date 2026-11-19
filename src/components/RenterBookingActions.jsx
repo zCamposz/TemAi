@@ -11,9 +11,13 @@ export default function RenterBookingActions({ booking: b }) {
   const navigate = useNavigate();
   const reviewed = useReviewedBookings(user.id);
 
-  const act = (fn, title, message) => () => {
-    fn();
-    showToast(title, message);
+  const act = (fn, title, message) => async () => {
+    try {
+      await fn();
+      showToast(title, message);
+    } catch (err) {
+      showToast("Não foi possível concluir", err?.message || "Tente novamente.");
+    }
   };
 
   const btn = (label, onClick, cls = "btn-outline") => (

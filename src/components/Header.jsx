@@ -122,6 +122,7 @@ export default function Header() {
             {user ? (
               <>
                 <Link to="/reservas">Reservas</Link>
+                <Link to="/mensagens">Mensagens</Link>
                 {profile?.is_admin ? <Link to="/admin">Painel admin</Link> : null}
                 <Link to="/perfil">Meu perfil</Link>
                 <button type="button" className="nav-signout" onClick={handleSignOut}>
@@ -142,6 +143,9 @@ export default function Header() {
             <>
               <Link to="/reservas" className="btn btn-ghost hide-sm">
                 Reservas
+              </Link>
+              <Link to="/mensagens" className="btn btn-ghost hide-sm">
+                Mensagens
               </Link>
               {profile?.is_admin ? (
                 <Link to="/admin" className="btn btn-ghost hide-sm">

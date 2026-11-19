@@ -1,13 +1,12 @@
-import { useSyncExternalStore } from "react";
-import { notify } from "./notifications";
+import { useCallback, useEffect, useState } from "react";
+import { isSupabaseConfigured, supabase } from "./supabase";
 
 /**
- * Reservas simuladas (Incremento 4).
- * Para a apresentação, tudo é guardado no localStorage do navegador:
- * não há banco nem gateway de pagamento reais.
+ * Reservas guardadas no Supabase (tabela `bookings`), compartilhadas entre
+ * locador e locatário. As mudanças de status passam por funções do banco
+ * (`create_booking` e `booking_transition`) que validam quem pode fazer o quê.
  */
 
-const STORAGE_KEY = "temai.reservas.v1";
 export const SERVICE_FEE = 0.1;
 
 /** Status que ocupam as datas do item (impedem reservas conflitantes). */
@@ -23,46 +22,90 @@ export const STATUS_LABEL = {
   cancelada: "Cancelada",
 };
 
-let cache = null;
 const listeners = new Set();
+const refresh = () => listeners.forEach((fn) => fn());
 
-function read() {
-  if (cache) return cache;
-  try {
-    cache = JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? [];
-  } catch {
-    cache = [];
-  }
-  return cache;
+function fromRow(r) {
+  return {
+    id: r.id,
+    slug: r.slug,
+    title: r.title,
+    icon: r.icon,
+    hue: r.hue,
+    photo: r.photo,
+    ownerId: r.owner_id,
+    ownerName: r.owner_name,
+    renterId: r.renter_id,
+    renterName: r.renter_name,
+    start: r.start_date,
+    end: r.end_date,
+    days: r.days,
+    subtotal: Number(r.subtotal),
+    fee: Number(r.fee),
+    deposit: Number(r.deposit),
+    total: Number(r.total),
+    status: r.status,
+    payment: r.payment,
+    createdAt: r.created_at,
+  };
 }
 
-function write(next) {
-  cache = next;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    /* armazenamento indisponível: mantém só em memória */
-  }
-  listeners.forEach((fn) => fn());
-}
+/** Reservas em que o usuário é locatário ou locador, atualizadas em tempo real. */
+export function useBookings(userId) {
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(Boolean(userId) && isSupabaseConfigured);
 
-function subscribe(fn) {
-  listeners.add(fn);
-  const onStorage = (e) => {
-    if (e.key === STORAGE_KEY) {
-      cache = null;
-      fn();
+  const load = useCallback(async () => {
+    if (!isSupabaseConfigured || !userId) {
+      setBookings([]);
+      setLoading(false);
+      return;
     }
-  };
-  window.addEventListener("storage", onStorage);
-  return () => {
-    listeners.delete(fn);
-    window.removeEventListener("storage", onStorage);
-  };
+    const { data } = await supabase
+      .from("bookings")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setBookings((data ?? []).map(fromRow));
+    setLoading(false);
+  }, [userId]);
+
+  useEffect(() => {
+    load();
+    if (!isSupabaseConfigured || !userId) return undefined;
+    listeners.add(load);
+    const channel = supabase
+      .channel(`bookings-${userId}-${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, load)
+      .subscribe();
+    // Reserva de segurança caso o tempo real esteja desligado no projeto.
+    const timer = setInterval(load, 20000);
+    return () => {
+      listeners.delete(load);
+      clearInterval(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [load, userId]);
+
+  return { bookings, loading };
 }
 
-export function useBookings() {
-  return useSyncExternalStore(subscribe, read, read);
+/** Períodos já ocupados de um item (para bloquear datas conflitantes). */
+export function useBlockedRanges(slug) {
+  const [ranges, setRanges] = useState([]);
+
+  const load = useCallback(async () => {
+    if (!isSupabaseConfigured || !slug) return setRanges([]);
+    const { data } = await supabase.rpc("booking_blocked_ranges", { p_slug: slug });
+    setRanges((data ?? []).map((r) => ({ start: r.start_date, end: r.end_date })));
+  }, [slug]);
+
+  useEffect(() => {
+    load();
+    listeners.add(load);
+    return () => listeners.delete(load);
+  }, [load]);
+
+  return ranges;
 }
 
 export function calcTotals(price, deposit, days) {
@@ -71,71 +114,42 @@ export function calcTotals(price, deposit, days) {
   return { subtotal, fee, deposit, total: subtotal + fee + deposit };
 }
 
-/** Retorna a reserva que conflita com o período, ou null. Devolução e retirada no mesmo dia são permitidas. */
-export function findConflict(bookings, slug, start, end) {
-  return (
-    bookings.find(
-      (b) => b.slug === slug && BLOCKING.includes(b.status) && start < b.end && end > b.start
-    ) ?? null
-  );
+/** Retorna o período que conflita com as datas, ou null. Devolução e retirada no mesmo dia são permitidas. */
+export function findConflict(ranges, start, end) {
+  return ranges.find((r) => start < r.end && end > r.start) ?? null;
 }
 
-export function createBooking({ product, user, renterName, start, end, days }) {
-  const booking = {
-    id: crypto.randomUUID(),
-    slug: product.slug,
-    title: product.title,
-    icon: product.icon,
-    hue: product.hue,
-    photo: product.photos?.[0] ?? null,
-    ownerId: product.ownerId ?? null,
-    ownerName: product.owner.name,
-    renterId: user.id,
-    renterName,
-    start,
-    end,
-    days,
-    ...calcTotals(product.price, product.deposit, days),
-    status: "confirmada",
-    payment: null,
-    createdAt: new Date().toISOString(),
-  };
-  write([booking, ...read()]);
-  notify(booking.ownerId, {
-    title: "Nova reserva",
-    message: `${renterName} reservou "${booking.title}" de ${start} a ${end}. Aguardando o pagamento.`,
+export async function createBooking({ product, renterName, start, end }) {
+  const { data, error } = await supabase.rpc("create_booking", {
+    p_slug: product.slug,
+    p_start: start,
+    p_end: end,
+    p_renter_name: renterName,
+    p_title: product.title,
+    p_icon: product.icon ?? null,
+    p_hue: product.hue ?? null,
+    p_photo: product.photos?.[0] ?? null,
+    p_owner_name: product.owner.name,
+    p_price: product.price,
+    p_deposit: product.deposit ?? 0,
   });
-  notify(booking.renterId, {
-    title: "Reserva criada",
-    message: `Faça o pagamento de "${booking.title}" para garantir o item.`,
+  if (error) throw error;
+  refresh();
+  return fromRow(data);
+}
+
+async function transition(id, action, payment = null) {
+  const { data, error } = await supabase.rpc("booking_transition", {
+    p_id: id,
+    p_action: action,
+    p_payment: payment,
   });
-  return booking;
+  if (error) throw error;
+  refresh();
+  return fromRow(data);
 }
 
-/** Atualiza a reserva e avisa as partes: `to` lista "owner" e/ou "renter". */
-function patch(id, changes, to = [], title = "", text = (b) => "") {
-  const current = read().find((b) => b.id === id);
-  write(read().map((b) => (b.id === id ? { ...b, ...changes } : b)));
-  if (!current) return;
-  const message = text(current);
-  if (to.includes("owner")) notify(current.ownerId, { title, message });
-  if (to.includes("renter")) notify(current.renterId, { title, message });
-}
-
-export const cancelBooking = (id) =>
-  patch(id, { status: "cancelada" }, ["owner"], "Reserva cancelada", (b) =>
-    `${b.renterName} cancelou a reserva de "${b.title}".`
-  );
-export const payBooking = (id, method) =>
-  patch(id, { status: "paga", payment: method }, ["owner"], "Pagamento recebido", (b) =>
-    `${b.renterName} pagou a reserva de "${b.title}". Combine a retirada.`
-  );
-export const confirmPickup = (id) =>
-  patch(id, { status: "em_andamento" }, ["renter"], "Retirada confirmada", (b) =>
-    `"${b.title}" está com você até ${b.end}. Ao devolver, clique em "Item devolvido".`
-  );
-export const confirmReturn = (id) =>
-  patch(id, { status: "concluida" }, ["renter", "owner"], "Reserva concluída", (b) =>
-    `A devolução de "${b.title}" foi registrada. Locatário, avalie o item em Reservas.`
-  );
-export const clearBookings = () => write([]);
+export const cancelBooking = (id) => transition(id, "cancel");
+export const payBooking = (id, method) => transition(id, "pay", method);
+export const confirmPickup = (id) => transition(id, "pickup");
+export const confirmReturn = (id) => transition(id, "return");

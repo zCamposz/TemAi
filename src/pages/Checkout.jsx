@@ -26,7 +26,7 @@ export default function Checkout() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const bookings = useBookings();
+  const { bookings, loading: loadingBookings } = useBookings(user.id);
   const booking = bookings.find((b) => b.id === id && b.renterId === user.id);
 
   const [step, setStep] = useState(0);
@@ -43,6 +43,15 @@ export default function Checkout() {
   }, [step]);
 
   // Só permanece na página se ainda faltar pagar (ou se acabou de pagar).
+  if (loadingBookings) {
+    return (
+      <Layout>
+        <div className="container" style={{ paddingTop: 48 }}>
+          <p className="empty-state">Carregando reserva…</p>
+        </div>
+      </Layout>
+    );
+  }
   if (!booking) return <Navigate to="/reservas" replace />;
   if (booking.status !== "confirmada" && step < 2 && !processing) {
     return <Navigate to="/reservas" replace />;
@@ -63,15 +72,21 @@ export default function Checkout() {
 
   function confirm() {
     setProcessing(true);
-    setTimeout(() => {
-      const label =
-        method === "Cartão de crédito" && installments > 1
-          ? `${method} em ${installments}x`
-          : method;
-      payBooking(booking.id, label);
-      setPaidMethod(label);
-      setProcessing(false);
-      setStep(2);
+    const label =
+      method === "Cartão de crédito" && installments > 1
+        ? `${method} em ${installments}x`
+        : method;
+    setTimeout(async () => {
+      try {
+        await payBooking(booking.id, label);
+        setPaidMethod(label);
+        setStep(2);
+      } catch (err) {
+        setError(err?.message || "Não foi possível registrar o pagamento.");
+        setStep(0);
+      } finally {
+        setProcessing(false);
+      }
     }, 1800);
   }
 

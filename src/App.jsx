@@ -15,6 +15,7 @@ import Announce from "./pages/Announce";
 import Bookings from "./pages/Bookings";
 import Checkout from "./pages/Checkout";
 import ReviewItem from "./pages/ReviewItem";
+import Messages from "./pages/Messages";
 import About from "./pages/About";
 import Ecopontos from "./pages/Ecopontos";
 
@@ -70,6 +71,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Bookings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mensagens"
+              element={
+                <ProtectedRoute>
+                  <Messages />
                 </ProtectedRoute>
               }
             />
