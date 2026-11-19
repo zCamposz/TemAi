@@ -86,6 +86,7 @@ export function mapRowToProduct(row) {
 
   return {
     id: row.id,
+    ownerId: row.owner_id,
     slug: row.slug,
     title: row.titulo,
     category: row.categoria,

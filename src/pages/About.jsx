@@ -232,8 +232,8 @@ export default function About() {
 
             {INCREMENTS.map((increment, index) => {
               const num = index + 1;
-              const isDone = num <= 3;
-              const isCurrent = num === 4;
+              const isDone = num <= 4;
+              const isCurrent = false;
               const itemClass = ["tl-item", isDone && "done", isCurrent && "current"]
                 .filter(Boolean)
                 .join(" ");
@@ -291,8 +291,8 @@ export default function About() {
             <div>
               <h2>Explore o Tem Aí?</h2>
               <p>
-                Os Incrementos 1 a 3 já entregam login, anúncios reais e busca por proximidade. O
-                próximo passo é o Incremento 4: reserva e transação.
+                Os Incrementos 1 a 4 já entregam login, anúncios reais, busca por proximidade e o
+                fluxo completo de reserva e pagamento.
               </p>
               <div className="cta-actions">
                 <Link to="/explorar" className="btn btn-accent btn-lg">
@@ -314,7 +314,7 @@ export default function About() {
               </li>
               <li>
                 <Icon name="checkCircle" />
-                Página de produto com simulação de reserva
+                Reserva, pagamento e devolução em um só fluxo
               </li>
               <li>
                 <Icon name="checkCircle" />

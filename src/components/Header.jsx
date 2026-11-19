@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
 import Icon, { BrandMark } from "./Icon";
+import NotificationBell from "./NotificationBell";
 import { getInitials } from "../lib/authErrors";
 
 const LINKS = [
@@ -14,7 +15,7 @@ const LINKS = [
 ];
 
 export default function Header() {
-  const { user, profile, loading, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
@@ -120,6 +121,8 @@ export default function Header() {
           <div className="nav-auth">
             {user ? (
               <>
+                <Link to="/reservas">Reservas</Link>
+                {profile?.is_admin ? <Link to="/admin">Painel admin</Link> : null}
                 <Link to="/perfil">Meu perfil</Link>
                 <button type="button" className="nav-signout" onClick={handleSignOut}>
                   Sair da conta
@@ -137,6 +140,15 @@ export default function Header() {
         <div className="header-actions">
           {user ? (
             <>
+              <Link to="/reservas" className="btn btn-ghost hide-sm">
+                Reservas
+              </Link>
+              {profile?.is_admin ? (
+                <Link to="/admin" className="btn btn-ghost hide-sm">
+                  Admin
+                </Link>
+              ) : null}
+              <NotificationBell />
               <Link to="/perfil" className="header-user" title={displayName}>
                 <span className="avatar header-avatar">{getInitials(displayName)}</span>
                 <span className="header-user-name">{displayName.split(" ")[0]}</span>
@@ -145,7 +157,7 @@ export default function Header() {
                 Sair
               </button>
             </>
-          ) : loading ? null : (
+          ) : (
             <Link to="/login" className="btn btn-ghost">
               Entrar
             </Link>

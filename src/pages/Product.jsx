@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout";
 import ProductCard from "../components/ProductCard";
@@ -6,9 +6,9 @@ import Icon, { Stars } from "../components/Icon";
 import { useAuth } from "../components/AuthProvider";
 import { useToast } from "../components/ToastProvider";
 import { REVIEWS, formatDistance, formatPrice, formatRating, getProduct } from "../data/catalog";
+import { calcTotals, createBooking, findConflict, useBookings } from "../lib/bookings";
 import { fetchProductBySlug, useMergedProducts } from "../lib/products";
 
-const SERVICE_FEE = 0.1;
 const THUMB_ICONS = ["box", "zap", "camera"];
 
 const toISO = (date) => date.toISOString().slice(0, 10);
@@ -34,7 +34,8 @@ export default function Product() {
   const { slug } = useParams();
   const catalogProduct = getProduct(slug);
   const { products } = useMergedProducts();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const bookings = useBookings();
   const navigate = useNavigate();
   const location = useLocation();
   const showToast = useToast();
@@ -44,6 +45,7 @@ export default function Product() {
   const [start, setStart] = useState(() => addDays(1));
   const [end, setEnd] = useState(() => addDays(3));
   const [activeThumb, setActiveThumb] = useState(0);
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -86,9 +88,9 @@ export default function Product() {
 
   if (!product) return <Navigate to="/explorar" replace />;
 
-  const subtotal = product.price * days;
-  const fee = Math.round(subtotal * SERVICE_FEE);
-  const total = subtotal + fee + product.deposit;
+  const { subtotal, fee, total } = calcTotals(product.price, product.deposit, days);
+  const conflict = findConflict(bookings, product.slug, start, end);
+  const invalidRange = !start || !end || end <= start;
   const city = product.city ?? "São Paulo";
   const photos = product.photos?.filter(Boolean) ?? [];
   const hasPhotos = photos.length > 0;
@@ -108,7 +110,7 @@ export default function Product() {
     .slice(0, 3);
 
   return (
-    <Layout note="a reserva e a transação end-to-end serão entregues no Incremento 4 do projeto">
+    <Layout>
       <div className="container" style={{ paddingTop: 32 }}>
         <nav className="breadcrumb" aria-label="Trilha de navegação">
           <Link to="/">Início</Link>
@@ -304,19 +306,33 @@ export default function Product() {
               <button
                 type="button"
                 className="btn btn-primary btn-lg btn-block"
+                disabled={Boolean(user) && (invalidRange || Boolean(conflict))}
                 onClick={() => {
                   if (!user) {
                     navigate("/login", { state: { from: location.pathname } });
                     return;
                   }
-                  showToast(
-                    "Reserva simulada!",
-                    "O processo end-to-end de reserva e transação será entregue no Incremento 4 do projeto."
-                  );
+                  if (invalidRange || conflict) return;
+                  createBooking({
+                    product,
+                    user,
+                    renterName: profile?.nome ?? user.user_metadata?.nome ?? "Locatário",
+                    start,
+                    end,
+                    days,
+                  });
+                  showToast("Solicitação enviada", "Aguarde a confirmação do locador em Reservas.");
+                  navigate("/reservas");
                 }}
               >
                 {user ? "Solicitar reserva" : "Entrar para reservar"}
               </button>
+              {user && conflict && (
+                <p className="form-error" role="alert">
+                  Este item já está reservado de {conflict.start.split("-").reverse().join("/")} a{" "}
+                  {conflict.end.split("-").reverse().join("/")}. Escolha outras datas.
+                </p>
+              )}
               <p className="booking-note">
                 {user
                   ? "Você ainda não será cobrado — o locador precisa confirmar."
@@ -343,12 +359,7 @@ export default function Product() {
                 <button
                   type="button"
                   className="btn btn-outline btn-sm"
-                  onClick={() =>
-                    showToast(
-                      "Chat em breve",
-                      "A conversa entre locador e locatário fará parte do Incremento 4."
-                    )
-                  }
+                  onClick={() => setChatOpen(true)}
                 >
                   Chat
                 </button>
@@ -380,6 +391,82 @@ export default function Product() {
           </section>
         )}
       </div>
+      {chatOpen && <ChatModal owner={product.owner} onClose={() => setChatOpen(false)} />}
     </Layout>
+  );
+}
+
+const AUTO_REPLIES = [
+  "Oi! Sim, o item está disponível. Para quais datas você precisa?",
+  "Perfeito! Posso combinar a retirada ou a entrega, como preferir.",
+  "Claro, qualquer dúvida é só falar. Pode reservar pelo site que eu confirmo rápido!",
+  "Combinado! 👍",
+];
+
+function ChatModal({ owner, onClose }) {
+  const [messages, setMessages] = useState([
+    { from: "owner", text: `Olá! Aqui é ${owner.name.split(" ")[0]}. Como posso ajudar?` },
+  ]);
+  const [text, setText] = useState("");
+  const [typing, setTyping] = useState(false);
+  const [replyIdx, setReplyIdx] = useState(0);
+  const endRef = useRef(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, typing]);
+
+  function send(e) {
+    e.preventDefault();
+    const value = text.trim();
+    if (!value || typing) return;
+    setMessages((m) => [...m, { from: "me", text: value }]);
+    setText("");
+    setTyping(true);
+    const reply = AUTO_REPLIES[replyIdx % AUTO_REPLIES.length];
+    setReplyIdx((i) => i + 1);
+    setTimeout(() => {
+      setMessages((m) => [...m, { from: "owner", text: reply }]);
+      setTyping(false);
+    }, 1200);
+  }
+
+  return (
+    <div className="chat-overlay" onClick={onClose}>
+      <div className="chat-box" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-head">
+          <span className={`avatar ${owner.avatar}`}>
+            {owner.avatarUrl ? <img src={owner.avatarUrl} alt="" /> : owner.initials}
+          </span>
+          <div>
+            <strong>{owner.name}</strong>
+            <small>responde em {owner.reply}</small>
+          </div>
+          <button type="button" className="chat-close" onClick={onClose} aria-label="Fechar">
+            ×
+          </button>
+        </div>
+        <div className="chat-body">
+          {messages.map((m, i) => (
+            <div key={i} className={`chat-msg ${m.from}`}>
+              {m.text}
+            </div>
+          ))}
+          {typing && <div className="chat-msg owner chat-typing">digitando…</div>}
+          <div ref={endRef} />
+        </div>
+        <form className="chat-form" onSubmit={send}>
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Escreva uma mensagem"
+            autoFocus
+          />
+          <button type="submit" className="btn btn-primary btn-sm">
+            Enviar
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }

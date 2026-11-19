@@ -2,7 +2,8 @@ import { Link } from "react-router-dom";
 import Layout from "../components/Layout";
 import SearchBar from "../components/SearchBar";
 import ProductCard from "../components/ProductCard";
-import Icon, { Stars } from "../components/Icon";
+import Testimonials from "../components/Testimonials";
+import Icon from "../components/Icon";
 import { useAuth } from "../components/AuthProvider";
 import { CATEGORIES, PRODUCTS } from "../data/catalog";
 import { hasProfileOrigin, originFromProfile } from "../lib/geo";
@@ -28,33 +29,6 @@ const STEPS = [
     icon: "recycle",
     title: "Devolva e avalie",
     text: "Entregue no prazo combinado e avalie a experiência. O item segue circulando na comunidade.",
-  },
-];
-
-const TESTIMONIALS = [
-  {
-    quote:
-      "Precisei de uma betoneira por dois dias para a reforma do quintal. Comprar custaria mais de R$ 1.500 — aluguei a 4 km de casa por R$ 160 e devolvi sem dor de cabeça.",
-    name: "Mariana S.",
-    role: "Locatária · Vila Mariana",
-    initials: "MS",
-    avatar: "av-5",
-  },
-  {
-    quote:
-      "Minhas ferramentas ficavam paradas na garagem de segunda a segunda. Hoje elas pagam a conta de luz: são quase R$ 400 por mês em aluguéis para vizinhos.",
-    name: "Carlos E.",
-    role: "Locador · Ipiranga",
-    initials: "CE",
-    avatar: "av-3",
-  },
-  {
-    quote:
-      "Montei a festa da minha filha inteira pelo app: tenda, mesas, caixa de som e máquina de algodão-doce. Tudo no mesmo bairro, tudo pela metade do preço das locadoras.",
-    name: "Juliana P.",
-    role: "Locatária · Saúde",
-    initials: "JP",
-    avatar: "av-2",
   },
 ];
 
@@ -369,34 +343,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ============ DEPOIMENTOS ============ */}
-      <section className="section">
-        <div className="container">
-          <div className="section-head center">
-            <span className="eyebrow" style={{ justifyContent: "center" }}>
-              Comunidade
-            </span>
-            <h2>Quem usa, recomenda</h2>
-            <p>Cenários reais que o Tem Aí? foi criado para resolver.</p>
-          </div>
-
-          <div className="testi-grid">
-            {TESTIMONIALS.map((item) => (
-              <article className="testi-card" key={item.name}>
-                <Stars />
-                <blockquote>&quot;{item.quote}&quot;</blockquote>
-                <div className="testi-author">
-                  <span className={`avatar ${item.avatar}`}>{item.initials}</span>
-                  <div>
-                    <strong>{item.name}</strong>
-                    <span>{item.role}</span>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ============ AVALIAÇÕES ============ */}
+      <Testimonials />
 
       {/* ============ CTA ============ */}
       <section className="section-tight">

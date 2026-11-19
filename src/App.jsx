@@ -2,7 +2,9 @@ import { useEffect } from "react";
 import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import AuthProvider from "./components/AuthProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminRoute from "./components/AdminRoute";
 import ToastProvider from "./components/ToastProvider";
+import Admin from "./pages/Admin";
 import Home from "./pages/Home";
 import Explore from "./pages/Explore";
 import Product from "./pages/Product";
@@ -10,6 +12,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import Announce from "./pages/Announce";
+import Bookings from "./pages/Bookings";
+import Checkout from "./pages/Checkout";
 import About from "./pages/About";
 import Ecopontos from "./pages/Ecopontos";
 
@@ -58,6 +62,30 @@ export default function App() {
                 <ProtectedRoute>
                   <Announce />
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reservas"
+              element={
+                <ProtectedRoute>
+                  <Bookings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout/:id"
+              element={
+                <ProtectedRoute>
+                  <Checkout />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <Admin />
+                </AdminRoute>
               }
             />
             <Route path="/sobre" element={<About />} />

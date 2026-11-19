@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/AuthLayout";
 import { useAuth } from "../components/AuthProvider";
-import { GoogleMark } from "../components/Icon";
 import { useToast } from "../components/ToastProvider";
 import { getAuthErrorMessage } from "../lib/authErrors";
 
@@ -51,7 +50,7 @@ export default function Login() {
     }
   }
 
-  if (loading || user) return null;
+  if (user) return null;
 
   return (
     <AuthLayout
@@ -97,38 +96,10 @@ export default function Login() {
           <label className="check-row" style={{ padding: 0 }}>
             <input type="checkbox" defaultChecked /> Lembrar de mim
           </label>
-          <a
-            href="#/login"
-            onClick={(e) => {
-              e.preventDefault();
-              showToast(
-                "Recuperação de senha",
-                "Em breve você poderá redefinir a senha por e-mail."
-              );
-            }}
-          >
-            Esqueci minha senha
-          </a>
         </div>
 
         <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={submitting}>
           {submitting ? "Entrando…" : "Entrar"}
-        </button>
-
-        <div className="auth-divider">ou continue com</div>
-
-        <button
-          type="button"
-          className="btn btn-social btn-block"
-          onClick={() =>
-            showToast(
-              "Login social",
-              "A autenticação com Google será habilitada em uma próxima entrega."
-            )
-          }
-        >
-          <GoogleMark />
-          Entrar com Google
         </button>
       </form>
 

@@ -327,4 +327,305 @@ $$;
 grant execute on function public.search_products_near(double precision, double precision, double precision)
   to anon, authenticated;
 
+-- ===========================================================================
+-- Painel administrativo: papel de admin, moderação de anúncios e verificação
+-- ===========================================================================
+
+alter table public.profiles add column if not exists is_admin boolean not null default false;
+comment on column public.profiles.is_admin is 'Administrador da plataforma. Só muda pelo SQL Editor (service_role).';
+
+-- Ninguém promove a si mesmo: o cliente só escreve nas colunas abaixo
+-- (is_admin e verificado ficam de fora). O trigger de cadastro é security definer.
+revoke insert, update on table public.profiles from anon, authenticated;
+grant insert (id, nome, telefone, avatar_url, cep, logradouro, numero, bairro, cidade, lat, lng)
+  on public.profiles to authenticated;
+grant update (nome, telefone, avatar_url, cep, logradouro, numero, bairro, cidade, lat, lng)
+  on public.profiles to authenticated;
+
+-- Anúncio suspenso pelo admin: some da busca e o dono não consegue reativar.
+alter table public.products drop constraint if exists products_status_check;
+alter table public.products
+  add constraint products_status_check
+  check (status in ('rascunho', 'publicado', 'suspenso'));
+
+drop policy if exists "Dono atualiza anúncio" on public.products;
+create policy "Dono atualiza anúncio"
+  on public.products for update
+  using (auth.uid() = owner_id and status <> 'suspenso')
+  with check (auth.uid() = owner_id and status <> 'suspenso');
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(
+    (select p.is_admin from public.profiles p where p.id = auth.uid()),
+    false
+  );
+$$;
+
+revoke all on function public.is_admin() from public, anon;
+grant execute on function public.is_admin() to authenticated;
+
+create or replace function public.admin_stats()
+returns json
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Acesso restrito a administradores' using errcode = '42501';
+  end if;
+  return (
+    select json_build_object(
+      'usuarios', (select count(*) from public.profiles),
+      'verificados', (select count(*) from public.profiles where verificado),
+      'anuncios', (select count(*) from public.products),
+      'publicados', (select count(*) from public.products where status = 'publicado'),
+      'suspensos', (select count(*) from public.products where status = 'suspenso')
+    )
+  );
+end;
+$$;
+
+create or replace function public.admin_list_profiles()
+returns table (
+  id uuid,
+  nome text,
+  telefone text,
+  verificado boolean,
+  is_admin boolean,
+  anuncios bigint,
+  created_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Acesso restrito a administradores' using errcode = '42501';
+  end if;
+  return query
+    select p.id, p.nome, p.telefone, p.verificado, p.is_admin,
+           (select count(*) from public.products x where x.owner_id = p.id),
+           p.created_at
+    from public.profiles p
+    order by p.created_at desc;
+end;
+$$;
+
+create or replace function public.admin_list_products()
+returns table (
+  id uuid,
+  slug text,
+  titulo text,
+  categoria text,
+  bairro text,
+  cidade text,
+  preco_dia numeric,
+  status text,
+  owner_id uuid,
+  owner_nome text,
+  created_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Acesso restrito a administradores' using errcode = '42501';
+  end if;
+  return query
+    select x.id, x.slug, x.titulo, x.categoria, x.bairro, x.cidade, x.preco_dia,
+           x.status, x.owner_id, p.nome, x.created_at
+    from public.products x
+    join public.profiles p on p.id = x.owner_id
+    order by x.created_at desc;
+end;
+$$;
+
+create or replace function public.admin_set_verified(target uuid, value boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Acesso restrito a administradores' using errcode = '42501';
+  end if;
+  update public.profiles set verificado = value where id = target;
+end;
+$$;
+
+create or replace function public.admin_set_product_status(target uuid, new_status text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Acesso restrito a administradores' using errcode = '42501';
+  end if;
+  if new_status not in ('publicado', 'suspenso') then
+    raise exception 'Status inválido' using errcode = '22023';
+  end if;
+  update public.products set status = new_status where id = target;
+end;
+$$;
+
+revoke all on function
+  public.admin_stats(),
+  public.admin_list_profiles(),
+  public.admin_list_products(),
+  public.admin_set_verified(uuid, boolean),
+  public.admin_set_product_status(uuid, text)
+from public, anon;
+grant execute on function
+  public.admin_stats(),
+  public.admin_list_profiles(),
+  public.admin_list_products(),
+  public.admin_set_verified(uuid, boolean),
+  public.admin_set_product_status(uuid, text)
+to authenticated;
+
+-- Para criar o primeiro admin (rode manualmente, trocando o e-mail):
+--   update public.profiles set is_admin = true
+--   where id = (select id from auth.users where email = 'admin@exemplo.com');
+
+-- ===========================================================================
+-- Avaliações da comunidade (depoimentos exibidos na home)
+-- Só avalia quem está logado; nome e e-mail são informados no envio.
+-- ===========================================================================
+
+create table if not exists public.avaliacoes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  nome text not null check (char_length(btrim(nome)) between 2 and 80),
+  email text not null check (email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+  nota smallint not null check (nota between 1 and 5),
+  comentario text not null check (char_length(btrim(comentario)) >= 10),
+  papel text check (papel in ('locatario', 'locador')),
+  bairro text,
+  visivel boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id)
+);
+
+-- Se a tabela já existia com limite de 500 caracteres, troca por "sem limite máximo".
+alter table public.avaliacoes drop constraint if exists avaliacoes_comentario_check;
+alter table public.avaliacoes
+  add constraint avaliacoes_comentario_check
+  check (char_length(btrim(comentario)) >= 10);
+
+comment on table public.avaliacoes is 'Avaliações da plataforma feitas por usuários logados. Uma por usuário.';
+comment on column public.avaliacoes.email is 'E-mail informado na avaliação. Privado: só o autor e admins leem.';
+comment on column public.avaliacoes.visivel is 'Moderação: admin pode ocultar uma avaliação da home.';
+
+create index if not exists avaliacoes_created_at_idx on public.avaliacoes (created_at desc);
+
+alter table public.avaliacoes enable row level security;
+
+drop policy if exists "Avaliações visíveis para todos" on public.avaliacoes;
+create policy "Avaliações visíveis para todos"
+  on public.avaliacoes for select
+  using (visivel or auth.uid() = user_id);
+
+drop policy if exists "Usuário logado cria a própria avaliação" on public.avaliacoes;
+create policy "Usuário logado cria a própria avaliação"
+  on public.avaliacoes for insert
+  to authenticated
+  with check (auth.uid() = user_id and visivel);
+
+drop policy if exists "Autor atualiza a própria avaliação" on public.avaliacoes;
+create policy "Autor atualiza a própria avaliação"
+  on public.avaliacoes for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id and visivel);
+
+drop policy if exists "Autor remove a própria avaliação" on public.avaliacoes;
+create policy "Autor remove a própria avaliação"
+  on public.avaliacoes for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+-- E-mail fica fora do SELECT público; o autor lê o próprio via get_own_avaliacao().
+revoke all on table public.avaliacoes from anon, authenticated;
+grant select (id, user_id, nome, nota, comentario, papel, bairro, visivel, created_at, updated_at)
+  on public.avaliacoes to anon, authenticated;
+grant insert (user_id, nome, email, nota, comentario, papel, bairro)
+  on public.avaliacoes to authenticated;
+grant update (nome, email, nota, comentario, papel, bairro)
+  on public.avaliacoes to authenticated;
+grant delete on table public.avaliacoes to authenticated;
+
+drop trigger if exists avaliacoes_updated_at on public.avaliacoes;
+create trigger avaliacoes_updated_at
+  before update on public.avaliacoes
+  for each row execute function public.set_updated_at();
+
+create or replace function public.get_own_avaliacao()
+returns public.avaliacoes
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select a.* from public.avaliacoes a where a.user_id = auth.uid();
+$$;
+
+revoke all on function public.get_own_avaliacao() from public, anon;
+grant execute on function public.get_own_avaliacao() to authenticated;
+
+-- Admin: lista (com e-mail) e oculta/exibe avaliações
+create or replace function public.admin_list_avaliacoes()
+returns setof public.avaliacoes
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Acesso restrito a administradores' using errcode = '42501';
+  end if;
+  return query select a.* from public.avaliacoes a order by a.created_at desc;
+end;
+$$;
+
+create or replace function public.admin_set_avaliacao_visivel(target uuid, value boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Acesso restrito a administradores' using errcode = '42501';
+  end if;
+  update public.avaliacoes set visivel = value where id = target;
+end;
+$$;
+
+revoke all on function
+  public.admin_list_avaliacoes(),
+  public.admin_set_avaliacao_visivel(uuid, boolean)
+from public, anon;
+grant execute on function
+  public.admin_list_avaliacoes(),
+  public.admin_set_avaliacao_visivel(uuid, boolean)
+to authenticated;
+
 notify pgrst, 'reload schema';

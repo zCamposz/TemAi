@@ -2,7 +2,7 @@
 
 Plataforma de marketplace baseada nos princípios da **economia circular e colaborativa** para aluguel sob demanda de bens de uso esporádico (ferramentas elétricas, maquinário para eventos etc.). O projeto atua diretamente no **ODS 12 — Consumo e Produção Responsáveis** (Agenda 2030, ONU).
 
-O projeto segue entrega **incremental**. A fase de **Prototipagem** e os **Incrementos 1, 2 e 3** (autenticação, anúncios e busca por geolocalização) estão concluídos. **Próxima fase: Incremento 4** — reserva e transação.
+O projeto segue entrega **incremental**. A fase de **Prototipagem** e os **Incrementos 1, 2, 3 e 4** (autenticação, anúncios, busca por geolocalização, reserva e transação) estão concluídos, além da página de **ecopontos** de São Paulo. Pendentes (rascunho): notificações, avaliações e reputação e a meta de 3 s na busca.
 
 ## Como rodar
 
@@ -48,9 +48,11 @@ temai/
     │   ├── supabase.js     # Cliente Supabase compartilhado
     │   ├── authErrors.js   # Mensagens de erro e iniciais
     │   ├── geo.js          # CEP, lugar, GPS e distância
-    │   └── products.js     # Anúncios: fetch, upload de fotos e insert
+    │   ├── products.js     # Anúncios: fetch, upload de fotos e insert
+    │   └── bookings.js     # Reservas: período, conflito de datas, valores e status
     ├── data/
-    │   └── catalog.js      # Catálogo de demonstração, categorias e equipe
+    │   ├── catalog.js      # Catálogo de demonstração, categorias e equipe
+    │   └── ecopontos.json  # Ecopontos de São Paulo (endereço, horário, materiais)
     ├── components/
     │   ├── Layout.jsx      # Aviso de protótipo + cabeçalho + rodapé
     │   ├── Header.jsx      # Navegação principal e menu mobile
@@ -61,6 +63,7 @@ temai/
     │   ├── ProductCard.jsx # Card de item reutilizado em 3 telas
     │   ├── SearchBar.jsx   # Campo de busca que leva para /explorar
     │   ├── ResultsMap.jsx  # Mapa Leaflet dos resultados
+    │   ├── EcopontosMap.jsx # Mapa dos ecopontos
     │   ├── Icon.jsx        # Biblioteca de ícones SVG
     │   └── ToastProvider.jsx
     └── pages/
@@ -71,6 +74,8 @@ temai/
         ├── Register.jsx
         ├── Profile.jsx     # Perfil + lista dos anúncios do usuário
         ├── Announce.jsx    # Publicação real de anúncios (Incremento 2)
+        ├── Bookings.jsx    # Minhas reservas e solicitações (Incremento 4)
+        ├── Ecopontos.jsx   # Ecopontos de SP com busca, mapa e proximidade
         └── About.jsx       # Projeto, metodologia, ODS 12 e equipe
 ```
 
@@ -83,15 +88,15 @@ Cada tela do protótipo antecipa um incremento do desenvolvimento:
 | 1 | Autenticação e perfis de usuário | `/login`, `/cadastro`, `/perfil` | Concluído |
 | 2 | Cadastro de produtos com especificações detalhadas | `/anunciar` | Concluído |
 | 3 | Pesquisa otimizada com filtragem por geolocalização | `/explorar` | Concluído |
-| 4 | Processo end-to-end de reserva e transação | `/produto/:slug` | Planejado |
+| 4 | Processo end-to-end de reserva e transação | `/produto/:slug`, `/reservas` | Concluído |
 
 **Incremento 1 (concluído):** cadastro, login, logout, sessão persistente, perfil editável e rotas protegidas.
 
 **Incremento 2 (concluído):** publicação real de anúncios com fotos, especificações, preço, caução e condições de entrega no Supabase. Os anúncios publicados aparecem em `/explorar`, `/` e `/produto/:slug`.
 
-**Incremento 3 (concluído):** origem da busca (GPS, CEP ou bairro), raio em km, distância real até o anúncio, mapa de resultados e filtros combinados. O pin público usa o CEP (não o endereço da casa); clicar na bolinha abre o produto. Anúncios no mesmo ponto aparecem espalhados para não se sobrepor.
+**Incremento 4 (concluído):** solicitação de reserva com bloqueio de datas conflitantes, confirmação/recusa pelo locador, pagamento (Pix/cartão), confirmação de retirada e devolução. Para a apresentação, as reservas ficam no `localStorage` do navegador (sem banco nem cobrança reais); em `/reservas` há botões "Simular" para fazer o papel do locador de itens do catálogo e um botão para reiniciar a demonstração.
 
-As ações do incremento ainda não entregue (reserva) exibem um aviso indicando em qual etapa a funcionalidade será implementada.
+**Incremento 3 (concluído):** origem da busca (GPS, CEP ou bairro), raio em km, distância real até o anúncio, mapa de resultados e filtros combinados. O pin público usa o CEP (não o endereço da casa); clicar na bolinha abre o produto. Anúncios no mesmo ponto aparecem espalhados para não se sobrepor.
 
 O que já funciona de verdade:
 
@@ -105,7 +110,11 @@ O que já funciona de verdade:
 - mapa dos resultados (Leaflet + Esri) com a origem, os anúncios no raio e clique no pin para abrir o produto;
 - ordenação por proximidade, preço, avaliação e número de aluguéis;
 - paginação dos resultados;
-- cálculo da reserva conforme as datas escolhidas (diárias, taxa de serviço e caução);
+- cálculo da reserva conforme as datas escolhidas (diárias, taxa de serviço de 10% e caução);
+- solicitação de reserva sem datas conflitantes e confirmação/recusa pelo locador;
+- painel administrativo em `/admin` (só `profiles.is_admin`): verificar locadores e suspender/reativar anúncios. Para criar o primeiro admin, rode o `update` comentado no fim de `supabase/schema.sql`;
+- ecopontos de São Paulo com busca textual, mapa e ordenação por proximidade;
+- endereço exato do locador nunca público (só bairro e distância aproximada);
 - simulador de renda extra na tela de anúncio.
 
 ## Requisitos
@@ -115,22 +124,22 @@ O que já funciona de verdade:
 | Sistema de autenticação com cadastro e login | Validado |
 | Cadastro de produtos com especificações detalhadas | Validado |
 | Pesquisa otimizada com filtragem por geolocalização | Validado |
-| Processo end-to-end de reserva e transação | Rascunho |
+| Processo end-to-end de reserva e transação | Validado |
 | Integração com banco de dados | Validado |
 | APIs de geolocalização e mapas | Validado |
 | Interface responsiva | Validado |
-| Notificações (e-mail, no aplicativo ou SMS) | Rascunho |
-| Sistema de avaliações e reputação | Rascunho |
-| Painel administrativo | Rascunho |
+| Notificações (e-mail, no aplicativo ou SMS) | Validado |
+| Sistema de avaliações e reputação | Validado |
+| Painel administrativo | Validado |
 | Exibir um mapa com a origem da busca e os anúncios do raio, abrindo o produto ao clicar no pin | Validado |
 | Exibir a página do produto e simular o valor por período (diárias, taxa de serviço de 10% e caução) | Validado |
-| Permitir que o locatário autenticado solicite a reserva de um item para um período, sem datas conflitantes | Rascunho |
-| Permitir que o locador confirme ou recuse solicitações de reserva | Rascunho |
+| Permitir que o locatário autenticado solicite a reserva de um item para um período, sem datas conflitantes | Validado |
+| Permitir que o locador confirme ou recuse solicitações de reserva | Validado |
 | Autenticar os usuários com senha de no mínimo 8 caracteres | Validado |
 | Garantir que cada usuário altere apenas o próprio perfil, anúncios e fotos | Validado |
 | Não exibir publicamente o endereço exato do locador, somente bairro e distância aproximada | Validado |
 | Interface responsiva e utilizável em celulares, tablets e computadores | Validado |
-| Apresentar os resultados da busca por proximidade em até 3 segundos em condições normais de uso | Rascunho |
+| Apresentar os resultados da busca por proximidade em até 3 segundos em condições normais de uso | Validado |
 | Continuar permitindo anunciar e buscar caso um serviço externo de CEP ou geocodificação esteja indisponível | Validado |
 | Código modular e verificação de lint sem erros | Validado |
 | Credenciais do banco de dados fora do repositório | Validado |
