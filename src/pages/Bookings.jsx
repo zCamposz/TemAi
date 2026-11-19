@@ -9,6 +9,7 @@ import { formatPrice } from "../data/catalog";
 import {
   STATUS_LABEL,
   confirmPickup,
+  clearFinishedBookings,
   useBookings,
 } from "../lib/bookings";
 
@@ -79,8 +80,9 @@ export default function Bookings() {
   const { bookings: all, loading } = useBookings(user.id);
   const [tab, setTab] = useState("minhas");
 
-  const mine = all.filter((b) => b.renterId === user.id);
-  const received = all.filter((b) => b.ownerId === user.id);
+  const mine = all.filter((b) => b.renterId === user.id && !b.renterHidden);
+  const received = all.filter((b) => b.ownerId === user.id && !b.ownerHidden);
+  const FINISHED = ["concluida", "recusada", "cancelada"];
 
   function act(fn, title, message) {
     return async () => {
@@ -116,6 +118,7 @@ export default function Bookings() {
   }
 
   const list = tab === "minhas" ? mine : received;
+  const finishedCount = list.filter((b) => FINISHED.includes(b.status)).length;
 
   return (
     <Layout>
@@ -147,6 +150,19 @@ export default function Bookings() {
               onClick={() => setTab("recebidas")}
             >
               Pedidos recebidos ({received.length})
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              style={{ marginLeft: "auto" }}
+              disabled={!finishedCount}
+              onClick={act(
+                () => clearFinishedBookings(tab === "minhas" ? "renter" : "owner"),
+                "Reservas limpas",
+                "As reservas finalizadas foram removidas da lista."
+              )}
+            >
+              Limpar reservas
             </button>
           </div>
 

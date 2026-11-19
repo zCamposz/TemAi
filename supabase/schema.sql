@@ -1202,3 +1202,55 @@ drop trigger if exists messages_notify_recipient on public.messages;
 create trigger messages_notify_recipient
   after insert on public.messages
   for each row execute function public.messages_notify_recipient();
+
+
+-- ===========================================================================
+-- Limpar reservas finalizadas (esconde só para quem limpou)
+-- ===========================================================================
+
+alter table public.bookings add column if not exists renter_hidden boolean not null default false;
+alter table public.bookings add column if not exists owner_hidden boolean not null default false;
+
+create or replace function public.clear_finished_bookings(p_role text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null then
+    raise exception 'Entre na sua conta.';
+  end if;
+  if p_role = 'renter' then
+    update public.bookings set renter_hidden = true
+    where renter_id = uid and status in ('concluida', 'recusada', 'cancelada');
+  elsif p_role = 'owner' then
+    update public.bookings set owner_hidden = true
+    where owner_id = uid and status in ('concluida', 'recusada', 'cancelada');
+  else
+    raise exception 'Ação inválida.';
+  end if;
+end;
+$$;
+
+revoke all on function public.clear_finished_bookings(text) from public, anon;
+grant execute on function public.clear_finished_bookings(text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+
+-- ===========================================================================
+-- Excluir conversas (apaga a conversa e as mensagens para os dois lados)
+-- ===========================================================================
+
+drop policy if exists "Participantes apagam a conversa" on public.conversations;
+create policy "Participantes apagam a conversa"
+  on public.conversations for delete
+  to authenticated
+  using (auth.uid() = owner_id or auth.uid() = renter_id);
+
+grant delete on table public.conversations to authenticated;
+
+notify pgrst, 'reload schema';

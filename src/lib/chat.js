@@ -136,3 +136,9 @@ export function useMessages(conversationId, userId) {
 
   return { messages, loading, append };
 }
+
+export async function deleteConversation(id) {
+  const { data, error } = await supabase.from("conversations").delete().eq("id", id).select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("Não foi possível excluir a conversa.");
+}

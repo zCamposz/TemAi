@@ -12,11 +12,11 @@ export function useNotifications(userId) {
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured || !userId) return setItems([]);
-    const { data } = await supabase
-      .from("notifications")
-      .select("id, title, message, read, created_at, link")
-      .order("created_at", { ascending: false })
-      .limit(100);
+    const query = (cols) =>
+      supabase.from("notifications").select(cols).order("created_at", { ascending: false }).limit(100);
+    let { data, error } = await query("id, title, message, read, created_at, link");
+    // Se a coluna `link` ainda não existe no banco, busca sem ela.
+    if (error) ({ data } = await query("id, title, message, read, created_at"));
     setItems(
       (data ?? []).map((n) => ({
         id: n.id,

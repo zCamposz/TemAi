@@ -46,6 +46,8 @@ function fromRow(r) {
     total: Number(r.total),
     status: r.status,
     payment: r.payment,
+    renterHidden: Boolean(r.renter_hidden),
+    ownerHidden: Boolean(r.owner_hidden),
     createdAt: r.created_at,
   };
 }
@@ -153,3 +155,9 @@ export const cancelBooking = (id) => transition(id, "cancel");
 export const payBooking = (id, method) => transition(id, "pay", method);
 export const confirmPickup = (id) => transition(id, "pickup");
 export const confirmReturn = (id) => transition(id, "return");
+
+export async function clearFinishedBookings(role) {
+  const { error } = await supabase.rpc("clear_finished_bookings", { p_role: role });
+  if (error) throw error;
+  refresh();
+}

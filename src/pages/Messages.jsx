@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import Layout from "../components/Layout";
 import { useAuth } from "../components/AuthProvider";
 import { getInitials } from "../lib/authErrors";
-import { fetchConversations, sendMessage, useMessages } from "../lib/chat";
+import { deleteConversation, fetchConversations, sendMessage, useMessages } from "../lib/chat";
 
 export default function Messages() {
   const { user } = useAuth();
@@ -30,6 +30,17 @@ export default function Messages() {
       clearInterval(timer);
     };
   }, [user?.id]);
+
+  async function handleDelete(id) {
+    if (!window.confirm("Excluir esta conversa? As mensagens serão apagadas para os dois lados.")) return;
+    try {
+      await deleteConversation(id);
+      setConversations((list) => list.filter((c) => c.id !== id));
+      if (id === activeId) setParams({});
+    } catch (err) {
+      setError(err?.message || "Não foi possível excluir a conversa.");
+    }
+  }
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
 
@@ -86,6 +97,7 @@ export default function Messages() {
                 conversation={active}
                 userId={user.id}
                 onBack={() => setParams({})}
+                onDelete={() => handleDelete(active.id)}
               />
             ) : null}
           </div>
@@ -95,7 +107,7 @@ export default function Messages() {
   );
 }
 
-function Thread({ conversation, userId, onBack }) {
+function Thread({ conversation, userId, onBack, onDelete }) {
   const { messages, loading, append } = useMessages(conversation.id, userId);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -143,6 +155,14 @@ function Thread({ conversation, userId, onBack }) {
             <Link to={`/produto/${conversation.product_slug}`}>{conversation.product_title}</Link>
           </small>
         </div>
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          style={{ marginLeft: "auto" }}
+          onClick={onDelete}
+        >
+          Excluir conversa
+        </button>
       </div>
       <div className="chat-body" ref={bodyRef}>
         {loading && <p style={{ color: "var(--muted)" }}>Carregando…</p>}
