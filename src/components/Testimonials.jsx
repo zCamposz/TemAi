@@ -14,7 +14,7 @@ function avatarFor(id) {
   return AVATARS[sum % AVATARS.length];
 }
 
-function RatingInput({ value, onChange }) {
+export function RatingInput({ value, onChange }) {
   return (
     <div className="testi-stars" role="radiogroup" aria-label="Nota">
       {[1, 2, 3, 4, 5].map((n) => (

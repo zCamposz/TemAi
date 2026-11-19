@@ -14,6 +14,7 @@ import Profile from "./pages/Profile";
 import Announce from "./pages/Announce";
 import Bookings from "./pages/Bookings";
 import Checkout from "./pages/Checkout";
+import ReviewItem from "./pages/ReviewItem";
 import About from "./pages/About";
 import Ecopontos from "./pages/Ecopontos";
 
@@ -77,6 +78,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Checkout />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/avaliar/:id"
+              element={
+                <ProtectedRoute>
+                  <ReviewItem />
                 </ProtectedRoute>
               }
             />

@@ -628,4 +628,124 @@ grant execute on function
   public.admin_set_avaliacao_visivel(uuid, boolean)
 to authenticated;
 
+-- ===========================================================================
+-- Avaliações de itens (feitas pelo locatário depois de devolver o item)
+-- product_slug é texto porque o catálogo de demonstração não está no banco;
+-- booking_id é o id da reserva (guardada no navegador), uma avaliação por reserva.
+-- ===========================================================================
+
+create table if not exists public.avaliacoes_produto (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  product_slug text not null,
+  booking_id text not null,
+  nome text not null check (char_length(btrim(nome)) between 2 and 80),
+  nota smallint not null check (nota between 1 and 5),
+  comentario text not null check (char_length(btrim(comentario)) >= 10),
+  visivel boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, booking_id)
+);
+
+comment on table public.avaliacoes_produto is 'Avaliação de um item por quem o alugou e devolveu. Uma por reserva.';
+comment on column public.avaliacoes_produto.visivel is 'Moderação: admin pode ocultar a avaliação.';
+
+create index if not exists avaliacoes_produto_slug_idx
+  on public.avaliacoes_produto (product_slug, created_at desc);
+
+alter table public.avaliacoes_produto enable row level security;
+
+drop policy if exists "Avaliações de itens visíveis" on public.avaliacoes_produto;
+create policy "Avaliações de itens visíveis"
+  on public.avaliacoes_produto for select
+  using (visivel or auth.uid() = user_id);
+
+drop policy if exists "Locatário cria avaliação do item" on public.avaliacoes_produto;
+create policy "Locatário cria avaliação do item"
+  on public.avaliacoes_produto for insert
+  to authenticated
+  with check (auth.uid() = user_id and visivel);
+
+drop policy if exists "Autor atualiza avaliação do item" on public.avaliacoes_produto;
+create policy "Autor atualiza avaliação do item"
+  on public.avaliacoes_produto for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id and visivel);
+
+drop policy if exists "Autor remove avaliação do item" on public.avaliacoes_produto;
+create policy "Autor remove avaliação do item"
+  on public.avaliacoes_produto for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+revoke all on table public.avaliacoes_produto from anon, authenticated;
+grant select on table public.avaliacoes_produto to anon, authenticated;
+grant insert (user_id, product_slug, booking_id, nome, nota, comentario)
+  on public.avaliacoes_produto to authenticated;
+grant update (nome, nota, comentario)
+  on public.avaliacoes_produto to authenticated;
+grant delete on table public.avaliacoes_produto to authenticated;
+
+drop trigger if exists avaliacoes_produto_updated_at on public.avaliacoes_produto;
+create trigger avaliacoes_produto_updated_at
+  before update on public.avaliacoes_produto
+  for each row execute function public.set_updated_at();
+
+-- Média e total por item (só avaliações visíveis), para cards e filtros.
+create or replace function public.produto_avaliacoes_resumo()
+returns table (product_slug text, media numeric, total bigint)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select a.product_slug, round(avg(a.nota)::numeric, 1), count(*)
+  from public.avaliacoes_produto a
+  where a.visivel
+  group by a.product_slug;
+$$;
+
+grant execute on function public.produto_avaliacoes_resumo() to anon, authenticated;
+
+-- Admin: oculta/exibe avaliação de item
+create or replace function public.admin_set_avaliacao_produto_visivel(target uuid, value boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Acesso restrito a administradores' using errcode = '42501';
+  end if;
+  update public.avaliacoes_produto set visivel = value where id = target;
+end;
+$$;
+
+revoke all on function public.admin_set_avaliacao_produto_visivel(uuid, boolean) from public, anon;
+grant execute on function public.admin_set_avaliacao_produto_visivel(uuid, boolean) to authenticated;
+
+-- Admin: promove/rebaixa outros administradores (não permite mexer em si mesmo)
+create or replace function public.admin_set_admin(target uuid, value boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Acesso restrito a administradores' using errcode = '42501';
+  end if;
+  if target = auth.uid() then
+    raise exception 'Você não pode alterar o seu próprio papel de administrador' using errcode = '42501';
+  end if;
+  update public.profiles set is_admin = value where id = target;
+end;
+$$;
+
+revoke all on function public.admin_set_admin(uuid, boolean) from public, anon;
+grant execute on function public.admin_set_admin(uuid, boolean) to authenticated;
+
 notify pgrst, 'reload schema';

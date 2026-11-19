@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Tem Aí? — marketplace de aluguel de bens de uso esporádico (Incremento 3 concluído)",
+  "description": "Tem Aí? — marketplace de aluguel de bens de uso esporádico (Incrementos 1 a 4 concluídos)",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

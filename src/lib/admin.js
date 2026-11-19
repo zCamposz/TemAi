@@ -13,6 +13,9 @@ export const fetchAdminProducts = () => call("admin_list_products");
 export const setUserVerified = (id, value) =>
   call("admin_set_verified", { target: id, value });
 
+export const setUserAdmin = (id, value) =>
+  call("admin_set_admin", { target: id, value });
+
 export const setProductStatus = (id, status) =>
   call("admin_set_product_status", { target: id, new_status: status });
 

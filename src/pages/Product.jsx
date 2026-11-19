@@ -3,9 +3,11 @@ import { Link, Navigate, useLocation, useNavigate, useParams } from "react-route
 import Layout from "../components/Layout";
 import ProductCard from "../components/ProductCard";
 import Icon, { Stars } from "../components/Icon";
+import { getInitials } from "../lib/authErrors";
+import { summarize, useProductReviews } from "../lib/avaliacoesProduto";
 import { useAuth } from "../components/AuthProvider";
 import { useToast } from "../components/ToastProvider";
-import { REVIEWS, formatDistance, formatPrice, formatRating, getProduct } from "../data/catalog";
+import { formatDistance, formatPrice, formatRating, getProduct } from "../data/catalog";
 import { calcTotals, createBooking, findConflict, useBookings } from "../lib/bookings";
 import { fetchProductBySlug, useMergedProducts } from "../lib/products";
 
@@ -40,6 +42,7 @@ export default function Product() {
   const location = useLocation();
   const showToast = useToast();
 
+  const { reviews: productReviews } = useProductReviews(slug);
   const [product, setProduct] = useState(catalogProduct ?? null);
   const [loading, setLoading] = useState(!catalogProduct);
   const [start, setStart] = useState(() => addDays(1));
@@ -88,6 +91,7 @@ export default function Product() {
 
   if (!product) return <Navigate to="/explorar" replace />;
 
+  const { rating, count: reviewCount } = summarize(productReviews);
   const { subtotal, fee, total } = calcTotals(product.price, product.deposit, days);
   const conflict = findConflict(bookings, product.slug, start, end);
   const invalidRange = !start || !end || end <= start;
@@ -129,8 +133,8 @@ export default function Product() {
           <div className="product-meta">
             <span className="rating-inline">
               <Icon name="star" size="sm" />
-              <strong>{formatRating(product.rating)}</strong>
-              {product.reviews > 0 ? <>&nbsp;· {product.reviews} avaliações</> : <>&nbsp;· novo</>}
+              <strong>{formatRating(rating)}</strong>
+              {reviewCount > 0 ? <>&nbsp;· {reviewCount} avaliações</> : <>&nbsp;· novo</>}
             </span>
             <span>
               <Icon name="pin" size="sm" />
@@ -220,27 +224,28 @@ export default function Product() {
             </div>
 
             <div className="detail-block">
-              <h2>Avaliações ({product.reviews})</h2>
-              {product.reviews > 0 ? (
-                REVIEWS.map((review) => (
-                  <div className="review-item" key={review.name}>
+              <h2>Avaliações ({reviewCount})</h2>
+              {reviewCount > 0 ? (
+                productReviews.map((review) => (
+                  <div className="review-item" key={review.id}>
                     <div className="review-head">
-                      <span className={`avatar ${review.avatar}`}>{review.initials}</span>
+                      <span className="avatar av-2">{getInitials(review.nome)}</span>
                       <div>
-                        <strong style={{ fontSize: "14.5px" }}>{review.name}</strong>
+                        <strong style={{ fontSize: "14.5px" }}>{review.nome}</strong>
                         <br />
                         <span style={{ fontSize: "12.5px", color: "var(--muted)" }}>
-                          {review.when}
+                          {new Date(review.created_at).toLocaleDateString("pt-BR")}
                         </span>
                       </div>
-                      <Stars />
+                      <Stars count={review.nota} />
                     </div>
-                    <p>{review.text}</p>
+                    <p>{review.comentario}</p>
                   </div>
                 ))
               ) : (
                 <p style={{ color: "var(--muted)" }}>
-                  Este anúncio ainda não recebeu avaliações. Seja o primeiro a alugar.
+                  Este anúncio ainda não recebeu avaliações. Elas aparecem aqui depois que
+                  alguém aluga e devolve o item.
                 </p>
               )}
             </div>
@@ -254,8 +259,8 @@ export default function Product() {
               </div>
               <div className="booking-rating">
                 <Icon name="star" size="sm" />
-                {formatRating(product.rating)}
-                {product.reviews > 0 ? ` · ${product.reviews} avaliações` : " · anúncio novo"} ·
+                {formatRating(rating)}
+                {reviewCount > 0 ? ` · ${reviewCount} avaliações` : " · anúncio novo"} ·
                 Cancelamento grátis até 24h antes
               </div>
 
@@ -313,7 +318,7 @@ export default function Product() {
                     return;
                   }
                   if (invalidRange || conflict) return;
-                  createBooking({
+                  const booking = createBooking({
                     product,
                     user,
                     renterName: profile?.nome ?? user.user_metadata?.nome ?? "Locatário",
@@ -321,11 +326,11 @@ export default function Product() {
                     end,
                     days,
                   });
-                  showToast("Solicitação enviada", "Aguarde a confirmação do locador em Reservas.");
-                  navigate("/reservas");
+                  showToast("Reserva criada", "Finalize o pagamento para garantir o item.");
+                  navigate(`/checkout/${booking.id}`);
                 }}
               >
-                {user ? "Solicitar reserva" : "Entrar para reservar"}
+                {user ? "Reservar e pagar" : "Entrar para reservar"}
               </button>
               {user && conflict && (
                 <p className="form-error" role="alert">
@@ -335,7 +340,7 @@ export default function Product() {
               )}
               <p className="booking-note">
                 {user
-                  ? "Você ainda não será cobrado — o locador precisa confirmar."
+                  ? "A reserva é imediata: você segue direto para o pagamento."
                   : "Você pode ver o item e simular o valor. Para alugar, entre na sua conta."}
               </p>
 

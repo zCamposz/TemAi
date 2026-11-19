@@ -4,10 +4,15 @@ import SearchBar from "../components/SearchBar";
 import ProductCard from "../components/ProductCard";
 import Testimonials from "../components/Testimonials";
 import Icon from "../components/Icon";
+import RenterBookingActions from "../components/RenterBookingActions";
 import { useAuth } from "../components/AuthProvider";
 import { CATEGORIES, PRODUCTS } from "../data/catalog";
 import { hasProfileOrigin, originFromProfile } from "../lib/geo";
 import { useMergedProducts } from "../lib/products";
+import { STATUS_LABEL, useBookings } from "../lib/bookings";
+
+const fmtDate = (iso) => iso.split("-").reverse().join("/");
+const ACTIVE = ["pendente", "confirmada", "paga", "em_andamento"];
 
 const STEPS = [
   {
@@ -52,7 +57,9 @@ const FAQ = [
 ];
 
 export default function Home() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const bookings = useBookings();
+  const active = user ? bookings.filter((b) => b.renterId === user.id && ACTIVE.includes(b.status)) : [];
   const origin = originFromProfile(profile);
   const fromProfile = hasProfileOrigin(profile);
   const { products } = useMergedProducts();
@@ -173,6 +180,53 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ============ MINHAS RESERVAS EM ANDAMENTO ============ */}
+      {active.length > 0 && (
+        <section className="section-tight">
+          <div className="container">
+            <div className="section-head">
+              <span className="eyebrow">Minhas reservas</span>
+              <h2>Seus aluguéis em andamento</h2>
+              <p>Pagou? Combine a retirada, confirme e devolva por aqui.</p>
+            </div>
+            <ul className="listing-list">
+              {active.map((b) => (
+                <li
+                  key={b.id}
+                  className="listing-row"
+                  style={{ alignItems: "flex-start", flexWrap: "wrap", gap: 20 }}
+                >
+                  {b.photo ? (
+                    <img src={b.photo} alt="" />
+                  ) : (
+                    <span className={`listing-thumb ${b.hue}`}>
+                      <Icon name={b.icon} />
+                    </span>
+                  )}
+                  <div style={{ flex: 1, minWidth: 220 }}>
+                    <h3>
+                      <Link to={`/produto/${b.slug}`}>{b.title}</Link>
+                    </h3>
+                    <p>
+                      {fmtDate(b.start)} a {fmtDate(b.end)} · {STATUS_LABEL[b.status]}
+                    </p>
+                    <p style={{ color: "var(--muted)", fontSize: 13 }}>Locador: {b.ownerName}</p>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <RenterBookingActions booking={b} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="section-cta">
+              <Link to="/reservas" className="btn btn-outline">
+                Ver todas as reservas
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ============ CATEGORIAS ============ */}
       <section className="section-tight">

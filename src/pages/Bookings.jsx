@@ -1,17 +1,15 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import Layout from "../components/Layout";
 import Icon from "../components/Icon";
+import RenterBookingActions from "../components/RenterBookingActions";
 import { useAuth } from "../components/AuthProvider";
 import { useToast } from "../components/ToastProvider";
 import { formatPrice } from "../data/catalog";
 import {
   STATUS_LABEL,
-  cancelBooking,
   clearBookings,
-  confirmPickup,
   confirmReturn,
-  respondBooking,
   useBookings,
 } from "../lib/bookings";
 
@@ -47,7 +45,7 @@ function StatusBadge({ status }) {
 
 function BookingRow({ booking, role, actions }) {
   return (
-    <li className="listing-row" style={{ alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+    <li className="listing-row" style={{ alignItems: "flex-start", flexWrap: "wrap", gap: 20 }}>
       {booking.photo ? (
         <img src={booking.photo} alt="" />
       ) : (
@@ -81,9 +79,9 @@ export default function Bookings() {
   const showToast = useToast();
   const all = useBookings();
   const [tab, setTab] = useState("minhas");
-  const navigate = useNavigate();
 
-  const mine = all.filter((b) => b.renterId === user.id);
+  // Em "Minhas reservas" só entram aluguéis concluídos; os em andamento ficam na Home.
+  const mine = all.filter((b) => b.renterId === user.id && b.status === "concluida");
   const received = all.filter((b) => b.ownerId === user.id);
 
   function act(fn, title, message) {
@@ -93,80 +91,12 @@ export default function Bookings() {
     };
   }
 
-  function renterActions(b) {
-    const btn = (label, onClick, cls = "btn-outline") => (
-      <button key={label} type="button" className={`btn ${cls} btn-sm`} onClick={onClick}>
-        {label}
-      </button>
-    );
-    const out = [];
-
-    if (b.status === "pendente") {
-      out.push(
-        btn("Cancelar", act(() => cancelBooking(b.id), "Reserva cancelada", "Cancelamento gratuito."))
-      );
-      // Apoio à demonstração: o locador do catálogo é fictício.
-      if (!b.ownerId) {
-        out.push(
-          btn(
-            "Locador aceita",
-            act(() => respondBooking(b.id, true), "Locador confirmou", "Agora é só pagar para garantir."),
-            "btn-primary"
-          ),
-          btn(
-            "Locador recusa",
-            act(() => respondBooking(b.id, false), "Locador recusou", "Tente outro período ou item.")
-          )
-        );
-      }
-    }
-    if (b.status === "confirmada") {
-      out.push(
-        btn("Pagar", () => navigate(`/checkout/${b.id}`), "btn-primary"),
-        btn("Cancelar", act(() => cancelBooking(b.id), "Reserva cancelada", "Nada foi cobrado."))
-      );
-    }
-    if (b.status === "paga") {
-      out.push(
-        btn(
-          "Confirmar retirada",
-          act(
-            () => confirmPickup(b.id),
-            "Retirada confirmada",
-            "O valor foi repassado ao locador. A caução fica retida até a devolução."
-          ),
-          "btn-primary"
-        )
-      );
-    }
-    if (b.status === "em_andamento" && !b.ownerId) {
-      out.push(
-        btn(
-          "Item devolvido",
-          act(() => confirmReturn(b.id), "Devolução confirmada", "Caução liberada. Aluguel concluído!"),
-          "btn-primary"
-        )
-      );
-    }
-    return out;
-  }
-
   function ownerActions(b) {
     const btn = (label, onClick, cls = "btn-outline") => (
       <button key={label} type="button" className={`btn ${cls} btn-sm`} onClick={onClick}>
         {label}
       </button>
     );
-    if (b.status === "pendente") {
-      return [
-        btn(
-          "Confirmar",
-          act(() => respondBooking(b.id, true), "Reserva confirmada", "O locatário foi avisado para pagar."),
-          "btn-primary"
-        ),
-        btn("Recusar", act(() => respondBooking(b.id, false), "Reserva recusada", "O período fica livre.")),
-      ];
-    }
     if (b.status === "em_andamento") {
       return [
         btn(
@@ -191,7 +121,7 @@ export default function Bookings() {
             <span>Reservas</span>
           </nav>
           <h1>Reservas</h1>
-          <p>Acompanhe o que você alugou e os pedidos recebidos nos seus anúncios.</p>
+          <p>Veja seus aluguéis concluídos e os pedidos recebidos nos seus anúncios.</p>
         </div>
       </section>
 
@@ -218,7 +148,7 @@ export default function Bookings() {
             <p style={{ color: "var(--muted)" }}>
               {tab === "minhas" ? (
                 <>
-                  Você ainda não reservou nada. <Link to="/explorar">Explorar itens</Link>
+                  Nenhum aluguel concluído ainda. Reservas em andamento aparecem na <Link to="/">página inicial</Link>.
                 </>
               ) : (
                 "Nenhum pedido nos seus anúncios por enquanto."
@@ -231,7 +161,7 @@ export default function Bookings() {
                   key={b.id}
                   booking={b}
                   role={tab === "minhas" ? "renter" : "owner"}
-                  actions={tab === "minhas" ? renterActions(b) : ownerActions(b)}
+                  actions={tab === "minhas" ? <RenterBookingActions booking={b} /> : ownerActions(b)}
                 />
               ))}
             </ul>

@@ -374,35 +374,14 @@ const UNVERIFIED_OWNERS = new Set(["Sandra L."]);
 
 export const PRODUCTS = RAW_PRODUCTS.map((product) => ({
   ...product,
+  // Notas vêm do banco (avaliacoes_produto); sem avaliação real, o item começa zerado.
+  rating: 0,
+  reviews: 0,
   city: product.city ?? "São Paulo",
   ...NEIGHBORHOOD_COORDS[product.neighborhood],
   delivery: WITH_DELIVERY.has(product.slug),
   owner: { ...product.owner, verified: !UNVERIFIED_OWNERS.has(product.owner.name) },
 }));
-
-export const REVIEWS = [
-  {
-    name: "Rafael A.",
-    initials: "RA",
-    avatar: "av-2",
-    when: "há 2 semanas",
-    text: "Ferramenta impecável, parecia nova. O locador ainda me deu dicas de qual broca usar para a parede do meu prédio. Processo super rápido.",
-  },
-  {
-    name: "Larissa T.",
-    initials: "LT",
-    avatar: "av-4",
-    when: "há 1 mês",
-    text: "Aluguei para montar uns móveis e pendurar prateleiras. Muito mais barato do que comprar uma que eu usaria uma vez por ano. Recomendo!",
-  },
-  {
-    name: "Diego M.",
-    initials: "DM",
-    avatar: "av-6",
-    when: "há 2 meses",
-    text: "Locador atencioso e pontual. Deu conta do serviço sem problemas. Devolvi no fim do dia e a caução voltou na hora.",
-  },
-];
 
 export const TEAM = [
   { name: "Lucas Pinheiro Marques", ra: "8222242608", initials: "LM", avatar: "av-1" },

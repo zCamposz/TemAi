@@ -15,7 +15,7 @@ export const BLOCKING = ["pendente", "confirmada", "paga", "em_andamento"];
 
 export const STATUS_LABEL = {
   pendente: "Aguardando locador",
-  confirmada: "Confirmada — falta pagar",
+  confirmada: "Aguardando pagamento",
   paga: "Paga — aguardando retirada",
   em_andamento: "Em andamento",
   concluida: "Concluída",
@@ -96,18 +96,18 @@ export function createBooking({ product, user, renterName, start, end, days }) {
     end,
     days,
     ...calcTotals(product.price, product.deposit, days),
-    status: "pendente",
+    status: "confirmada",
     payment: null,
     createdAt: new Date().toISOString(),
   };
   write([booking, ...read()]);
   notify(booking.ownerId, {
-    title: "Nova solicitação de reserva",
-    message: `${renterName} quer alugar "${booking.title}" de ${start} a ${end}.`,
+    title: "Nova reserva",
+    message: `${renterName} reservou "${booking.title}" de ${start} a ${end}. Aguardando o pagamento.`,
   });
   notify(booking.renterId, {
-    title: "Solicitação enviada",
-    message: `Aguardando ${booking.ownerName} responder sobre "${booking.title}".`,
+    title: "Reserva criada",
+    message: `Faça o pagamento de "${booking.title}" para garantir o item.`,
   });
   return booking;
 }
@@ -122,17 +122,6 @@ function patch(id, changes, to = [], title = "", text = (b) => "") {
   if (to.includes("renter")) notify(current.renterId, { title, message });
 }
 
-export const respondBooking = (id, accept) =>
-  patch(
-    id,
-    { status: accept ? "confirmada" : "recusada" },
-    ["renter"],
-    accept ? "Reserva confirmada" : "Reserva recusada",
-    (b) =>
-      accept
-        ? `${b.ownerName} aceitou "${b.title}". Faça o pagamento para garantir.`
-        : `${b.ownerName} recusou a reserva de "${b.title}".`
-  );
 export const cancelBooking = (id) =>
   patch(id, { status: "cancelada" }, ["owner"], "Reserva cancelada", (b) =>
     `${b.renterName} cancelou a reserva de "${b.title}".`

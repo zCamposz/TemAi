@@ -48,7 +48,10 @@ export default function NotificationBell() {
         className="notif-btn"
         aria-label={unread ? `Notificações (${unread} não lidas)` : "Notificações"}
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open && unread) markAllRead(user.id);
+          setOpen((v) => !v);
+        }}
       >
         <Icon name="bell" />
         {unread > 0 ? <span className="notif-badge">{unread > 9 ? "9+" : unread}</span> : null}

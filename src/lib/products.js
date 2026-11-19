@@ -3,6 +3,7 @@ import { useAuth } from "../components/AuthProvider";
 import { CATEGORIES, PRODUCTS } from "../data/catalog";
 import { originFromProfile, withDistance } from "./geo";
 import { getInitials } from "./authErrors";
+import { fetchRatingSummary } from "./avaliacoesProduto";
 import { isSupabaseConfigured, supabase } from "./supabase";
 
 const PHOTO_BUCKET = "product-photos";
@@ -333,8 +334,12 @@ export function useMergedProducts() {
 
     (async () => {
       try {
-        const live = await fetchPublishedProducts();
-        if (mounted) setCatalog(mergeCatalog(live));
+        const [live, ratings] = await Promise.all([fetchPublishedProducts(), fetchRatingSummary()]);
+        if (mounted) {
+          setCatalog(
+            mergeCatalog(live).map((product) => ({ ...product, ...ratings.get(product.slug) }))
+          );
+        }
       } catch {
         if (mounted) setCatalog(PRODUCTS);
       } finally {
