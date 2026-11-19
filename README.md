@@ -292,5 +292,5 @@ As reservas (`booking_id`) ficam no navegador, não no banco; por isso `avaliaco
 | --- | --- |
 | Lucas Pinheiro Marques | 8222242608 |
 | Leonardo Del Carlo | 823157802 |
-| Pedro Henrique Pontes | 823135028 |
+| Pedro Henrique Pontes da Silva| 823135028 |
 | Gabriel Campos Batista de Souza | 823125083 |
