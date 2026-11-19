@@ -132,10 +132,10 @@ export const payBooking = (id, method) =>
   );
 export const confirmPickup = (id) =>
   patch(id, { status: "em_andamento" }, ["renter"], "Retirada confirmada", (b) =>
-    `"${b.title}" está com você até ${b.end}.`
+    `"${b.title}" está com você até ${b.end}. Ao devolver, clique em "Item devolvido".`
   );
 export const confirmReturn = (id) =>
   patch(id, { status: "concluida" }, ["renter", "owner"], "Reserva concluída", (b) =>
-    `A devolução de "${b.title}" foi confirmada. Obrigado por usar o Tem Aí?`
+    `A devolução de "${b.title}" foi registrada. Locatário, avalie o item em Reservas.`
   );
 export const clearBookings = () => write([]);

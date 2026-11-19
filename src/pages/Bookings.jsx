@@ -9,7 +9,7 @@ import { formatPrice } from "../data/catalog";
 import {
   STATUS_LABEL,
   clearBookings,
-  confirmReturn,
+  confirmPickup,
   useBookings,
 } from "../lib/bookings";
 
@@ -80,8 +80,7 @@ export default function Bookings() {
   const all = useBookings();
   const [tab, setTab] = useState("minhas");
 
-  // Em "Minhas reservas" só entram aluguéis concluídos; os em andamento ficam na Home.
-  const mine = all.filter((b) => b.renterId === user.id && b.status === "concluida");
+  const mine = all.filter((b) => b.renterId === user.id);
   const received = all.filter((b) => b.ownerId === user.id);
 
   function act(fn, title, message) {
@@ -97,11 +96,15 @@ export default function Bookings() {
         {label}
       </button>
     );
-    if (b.status === "em_andamento") {
+    if (b.status === "paga") {
       return [
         btn(
-          "Confirmar devolução",
-          act(() => confirmReturn(b.id), "Devolução confirmada", "Caução liberada ao locatário."),
+          "Confirmar retirada",
+          act(
+            () => confirmPickup(b.id),
+            "Retirada confirmada",
+            "O valor foi repassado a você. A caução fica retida até a devolução."
+          ),
           "btn-primary"
         ),
       ];
@@ -121,7 +124,7 @@ export default function Bookings() {
             <span>Reservas</span>
           </nav>
           <h1>Reservas</h1>
-          <p>Veja seus aluguéis concluídos e os pedidos recebidos nos seus anúncios.</p>
+          <p>Acompanhe seus aluguéis (pagamento, devolução e avaliação) e os pedidos recebidos nos seus anúncios.</p>
         </div>
       </section>
 
@@ -147,9 +150,7 @@ export default function Bookings() {
           {list.length === 0 ? (
             <p style={{ color: "var(--muted)" }}>
               {tab === "minhas" ? (
-                <>
-                  Nenhum aluguel concluído ainda. Reservas em andamento aparecem na <Link to="/">página inicial</Link>.
-                </>
+                "Você ainda não fez nenhuma reserva."
               ) : (
                 "Nenhum pedido nos seus anúncios por enquanto."
               )}

@@ -30,7 +30,8 @@ export default function RenterBookingActions({ booking: b }) {
       btn("Cancelar", act(() => cancelBooking(b.id), "Reserva cancelada", "Nada foi cobrado."))
     );
   }
-  if (b.status === "paga") {
+  // A retirada é confirmada pelo locador. Itens de demonstração (sem locador real) ficam com o locatário.
+  if (b.status === "paga" && !b.ownerId) {
     out.push(
       btn(
         "Confirmar retirada",
@@ -43,7 +44,7 @@ export default function RenterBookingActions({ booking: b }) {
       )
     );
   }
-  if (b.status === "em_andamento" && !b.ownerId) {
+  if (b.status === "em_andamento") {
     out.push(
       btn(
         "Item devolvido",
